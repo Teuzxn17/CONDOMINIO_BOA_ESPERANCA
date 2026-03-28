@@ -228,37 +228,77 @@ const Dashboard = ({ moradores, pagamentos, financeiro }) => {
 const Casas = ({ moradores, pagamentos, setPage, setSelectedCasa }) => {
   const [mes, setMes] = useState(getMesAtual());
   const [busca, setBusca] = useState("");
+  const [filtroStatus, setFiltroStatus] = useState("todos");
 
-  const filtrados = moradores.filter(m =>
+  // Calcula status de todos primeiro
+  const moradoresComStatus = moradores.map(m => ({
+    ...m,
+    status: getStatusCasa(m.casa_id, mes, pagamentos),
+  }));
+
+  // Counts para os badges (antes do filtro de status, mas depois da busca)
+  const buscados = moradoresComStatus.filter(m =>
     m.nome.toLowerCase().includes(busca.toLowerCase()) ||
     m.casa_id.toLowerCase().includes(busca.toLowerCase())
   );
-
   const counts = { pago:0, pendente:0, atrasado:0 };
-  filtrados.forEach(m => { const s = getStatusCasa(m.casa_id, mes, pagamentos); if(counts[s]!==undefined) counts[s]++; });
+  buscados.forEach(m => { if (counts[m.status] !== undefined) counts[m.status]++; });
+
+  // Lista final com filtro de status aplicado
+  const filtrados = buscados.filter(m =>
+    filtroStatus === "todos" ? true : m.status === filtroStatus
+  );
+
+  const statusBtns = [
+    { key:"todos",    label:"Todos",    color:"#38bdf8" },
+    { key:"pago",     label:"Pagos",    color:STATUS_COLORS.pago.bg     },
+    { key:"pendente", label:"Pendente", color:STATUS_COLORS.pendente.bg },
+    { key:"atrasado", label:"Atrasado", color:STATUS_COLORS.atrasado.bg },
+  ];
 
   return (
     <div style={{ padding:"20px 16px", paddingBottom:80 }}>
       <h1 style={{ color:"#f1f5f9", fontSize:22, fontWeight:800, marginBottom:16 }}>Casas</h1>
 
+      {/* Navegação de mês */}
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", background:"#1e293b", borderRadius:14, padding:"10px 16px", marginBottom:16 }}>
         <button onClick={() => setMes(navMes(mes,-1))} style={{ background:"none", border:"none", color:"#38bdf8", cursor:"pointer", padding:4 }}><Icon name="arrow_l" size={18} color="#38bdf8" /></button>
         <span style={{ color:"#f1f5f9", fontWeight:700, fontSize:14 }}>{capFirst(formatMes(mes))}</span>
         <button onClick={() => setMes(navMes(mes,1))}  style={{ background:"none", border:"none", color:"#38bdf8", cursor:"pointer", padding:4 }}><Icon name="arrow_r" size={18} color="#38bdf8" /></button>
       </div>
 
-      <div style={{ position:"relative", marginBottom:16 }}>
+      {/* Busca */}
+      <div style={{ position:"relative", marginBottom:12 }}>
         <div style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)" }}><Icon name="search" size={16} color="#64748b" /></div>
-        <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar por nome ou casa..."
-          style={{ width:"100%", background:"#1e293b", border:"1px solid #334155", borderRadius:12, padding:"11px 12px 11px 38px", color:"#f1f5f9", fontSize:14, outline:"none", boxSizing:"border-box" }} />
+        <input
+          value={busca}
+          onChange={e => setBusca(e.target.value)}
+          placeholder="Buscar por nome ou casa..."
+          style={{ width:"100%", background:"#1e293b", border:"1px solid #334155", borderRadius:12, padding:"11px 12px 11px 38px", color:"#f1f5f9", fontSize:14, outline:"none", boxSizing:"border-box" }}
+        />
       </div>
 
-      <div style={{ display:"flex", gap:8, marginBottom:16 }}>
-        {Object.entries(counts).map(([k,v]) => (
-          <div key={k} style={{ flex:1, background:`${STATUS_COLORS[k].bg}15`, border:`1px solid ${STATUS_COLORS[k].bg}33`, borderRadius:10, padding:"8px 0", textAlign:"center" }}>
-            <div style={{ color:STATUS_COLORS[k].bg, fontWeight:800, fontSize:18 }}>{v}</div>
-            <div style={{ color:STATUS_COLORS[k].bg, fontSize:10, fontWeight:600 }}>{STATUS_COLORS[k].label}</div>
-          </div>
+      {/* Badges de contagem — clicáveis como filtro */}
+      <div style={{ display:"flex", gap:8, marginBottom:12 }}>
+        {Object.entries(counts).map(([k,v]) => {
+          const ativo = filtroStatus === k;
+          return (
+            <button key={k} onClick={() => setFiltroStatus(filtroStatus === k ? "todos" : k)}
+              style={{ flex:1, background: ativo ? `${STATUS_COLORS[k].bg}30` : `${STATUS_COLORS[k].bg}10`, border:`1.5px solid ${ativo ? STATUS_COLORS[k].bg : STATUS_COLORS[k].bg+"33"}`, borderRadius:10, padding:"8px 0", textAlign:"center", cursor:"pointer", transition:"all .15s" }}>
+              <div style={{ color:STATUS_COLORS[k].bg, fontWeight:800, fontSize:18 }}>{v}</div>
+              <div style={{ color:STATUS_COLORS[k].bg, fontSize:10, fontWeight:600 }}>{STATUS_COLORS[k].label}</div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Filtro de status por botões de texto */}
+      <div style={{ display:"flex", gap:6, marginBottom:16, flexWrap:"wrap" }}>
+        {statusBtns.map(b => (
+          <button key={b.key} onClick={() => setFiltroStatus(b.key)}
+            style={{ padding:"6px 14px", borderRadius:20, border:`1.5px solid ${filtroStatus===b.key ? b.color : "#334155"}`, background: filtroStatus===b.key ? `${b.color}18` : "transparent", color: filtroStatus===b.key ? b.color : "#64748b", fontSize:12, fontWeight:600, cursor:"pointer", transition:"all .15s" }}>
+            {b.label} {b.key !== "todos" && `(${counts[b.key] ?? 0})`}
+          </button>
         ))}
       </div>
 
@@ -270,7 +310,7 @@ const Casas = ({ moradores, pagamentos, setPage, setSelectedCasa }) => {
       ) : (
         <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
           {filtrados.map(m => (
-            <HouseCard key={m.id} morador={m} status={getStatusCasa(m.casa_id, mes, pagamentos)}
+            <HouseCard key={m.id} morador={m} status={m.status}
               onClick={() => { setSelectedCasa(m); setPage("casa_detalhe"); }} />
           ))}
         </div>
@@ -287,7 +327,7 @@ const CasaDetalhe = ({ casa, pagamentos, setPage, toast, reload }) => {
   const [editData, setEditData] = useState({ ...casa });
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [pagForm, setPagForm] = useState({ valor:150, forma:"pix", mes:getMesAtual() });
+  const [pagForm, setPagForm] = useState({ valor:150, forma:"pix", mes:getMesAtual(), dataPagamento: new Date().toISOString().split("T")[0] });
 
   const pagsCasa = pagamentos.filter(p => p.casa_id === casa.casa_id).sort((a,b) => new Date(b.data_pagamento)-new Date(a.data_pagamento));
   const statusAtual = getStatusCasa(casa.casa_id, null, pagamentos);
@@ -308,7 +348,7 @@ const CasaDetalhe = ({ casa, pagamentos, setPage, toast, reload }) => {
     if (pagForm.valor <= 0) { toast("Valor inválido","error"); return; }
     setLoading(true);
     try {
-      await api.addPagamento({ casa_id:casa.casa_id, mes:pagForm.mes, valor:+pagForm.valor, forma_pagamento:pagForm.forma, data_pagamento:new Date().toISOString() });
+      await api.addPagamento({ casa_id:casa.casa_id, mes:pagForm.mes, valor:+pagForm.valor, forma_pagamento:pagForm.forma, data_pagamento: new Date(pagForm.dataPagamento + "T12:00:00").toISOString() });
       await reload();
       setShowModal(false);
       toast("Pagamento registrado!");
@@ -421,6 +461,12 @@ const CasaDetalhe = ({ casa, pagamentos, setPage, toast, reload }) => {
               <input type="number" value={pagForm.valor} min="0" step="0.01" onChange={e => setPagForm(p=>({...p,valor:e.target.value}))}
                 style={{ width:"100%", background:"#0f172a", border:"1px solid #334155", borderRadius:10, padding:"10px 12px", color:"#f1f5f9", fontSize:14, outline:"none", boxSizing:"border-box" }} />
             </div>
+            <div style={{ marginBottom:14 }}>
+              <label style={{ color:"#94a3b8", fontSize:12, display:"block", marginBottom:6 }}>Data do Pagamento</label>
+              <input type="date" value={pagForm.dataPagamento} onChange={e => setPagForm(p=>({...p,dataPagamento:e.target.value}))}
+                style={{ width:"100%", background:"#0f172a", border:"1px solid #334155", borderRadius:10, padding:"10px 12px", color:"#f1f5f9", fontSize:14, outline:"none", boxSizing:"border-box" }} />
+              <div style={{ color:"#64748b", fontSize:11, marginTop:4 }}>Pré-preenchida com hoje. Altere se necessário.</div>
+            </div>
             <div style={{ marginBottom:20 }}>
               <label style={{ color:"#94a3b8", fontSize:12, display:"block", marginBottom:8 }}>Forma de Pagamento</label>
               <div style={{ display:"flex", gap:8 }}>
@@ -445,53 +491,64 @@ const CasaDetalhe = ({ casa, pagamentos, setPage, toast, reload }) => {
 // ============================================================
 // CADASTRO
 // ============================================================
+const CadastroField = ({ label, value, onChange, placeholder, required, type = "text" }) => (
+  <div style={{ marginBottom:16 }}>
+    <label style={{ color:"#94a3b8", fontSize:12, display:"block", marginBottom:6 }}>
+      {label}{required && <span style={{ color:"#f87171" }}> *</span>}
+    </label>
+    <input
+      type={type}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      style={{ width:"100%", background:"#1e293b", border:"1px solid #334155", borderRadius:12, padding:"12px 14px", color:"#f1f5f9", fontSize:14, outline:"none", boxSizing:"border-box" }}
+    />
+  </div>
+);
+
 const Cadastro = ({ toast, reload, setPage }) => {
-  const [form, setForm] = useState({ nome:"", telefone:"", cpf:"", quadra:"", numero_casa:"" });
+  const [nome, setNome] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [cpf, setCpf] = useState("");
+  const [quadra, setQuadra] = useState("");
+  const [numeroCasa, setNumeroCasa] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async () => {
-    if (!form.nome||!form.telefone||!form.quadra||!form.numero_casa) { toast("Preencha todos os campos obrigatórios","error"); return; }
+    if (!nome || !telefone || !quadra || !numeroCasa) { toast("Preencha todos os campos obrigatórios","error"); return; }
     setLoading(true);
     try {
-      await api.addMorador({ ...form, quadra:form.quadra.toUpperCase(), casa_id:`${form.quadra.toUpperCase()}-${form.numero_casa}` });
+      await api.addMorador({ nome, telefone, cpf, quadra: quadra.toUpperCase(), numero_casa: numeroCasa, casa_id:`${quadra.toUpperCase()}-${numeroCasa}` });
       await reload();
       toast("Condômino cadastrado com sucesso!");
-      setForm({ nome:"", telefone:"", cpf:"", quadra:"", numero_casa:"" });
+      setNome(""); setTelefone(""); setCpf(""); setQuadra(""); setNumeroCasa("");
       setPage("casas");
     } catch { toast("Erro ao cadastrar","error"); } finally { setLoading(false); }
   };
-
-  const F = ({ label, field, placeholder, required }) => (
-    <div style={{ marginBottom:16 }}>
-      <label style={{ color:"#94a3b8", fontSize:12, display:"block", marginBottom:6 }}>{label}{required&&<span style={{ color:"#f87171" }}> *</span>}</label>
-      <input value={form[field]||""} onChange={e => setForm(p=>({...p,[field]:e.target.value}))} placeholder={placeholder}
-        style={{ width:"100%", background:"#1e293b", border:"1px solid #334155", borderRadius:12, padding:"12px 14px", color:"#f1f5f9", fontSize:14, outline:"none", boxSizing:"border-box" }} />
-    </div>
-  );
 
   return (
     <div style={{ padding:"20px 16px", paddingBottom:80 }}>
       <h1 style={{ color:"#f1f5f9", fontSize:22, fontWeight:800, marginBottom:4 }}>Novo Condômino</h1>
       <p style={{ color:"#64748b", fontSize:13, marginBottom:24 }}>Preencha os dados do morador</p>
       <div style={{ background:"#1e293b", borderRadius:16, padding:"20px" }}>
-        <F label="Nome completo" field="nome"     placeholder="João da Silva"      required />
-        <F label="Telefone"      field="telefone" placeholder="(91) 99999-9999"    required />
-        <F label="CPF"           field="cpf"      placeholder="000.000.000-00"              />
+        <CadastroField label="Nome completo" value={nome}     onChange={e => setNome(e.target.value)}     placeholder="João da Silva"   required />
+        <CadastroField label="Telefone"      value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(91) 99999-9999" required />
+        <CadastroField label="CPF"           value={cpf}      onChange={e => setCpf(e.target.value)}      placeholder="000.000.000-00"  />
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
           <div>
             <label style={{ color:"#94a3b8", fontSize:12, display:"block", marginBottom:6 }}>Quadra <span style={{ color:"#f87171" }}>*</span></label>
-            <input value={form.quadra||""} onChange={e => setForm(p=>({...p,quadra:e.target.value.toUpperCase()}))} placeholder="A"
+            <input value={quadra} onChange={e => setQuadra(e.target.value.toUpperCase())} placeholder="A"
               style={{ width:"100%", background:"#0f172a", border:"1px solid #334155", borderRadius:10, padding:"12px 14px", color:"#f1f5f9", fontSize:14, outline:"none", boxSizing:"border-box" }} />
           </div>
           <div>
             <label style={{ color:"#94a3b8", fontSize:12, display:"block", marginBottom:6 }}>Nº Casa <span style={{ color:"#f87171" }}>*</span></label>
-            <input value={form.numero_casa||""} onChange={e => setForm(p=>({...p,numero_casa:e.target.value}))} placeholder="01"
+            <input value={numeroCasa} onChange={e => setNumeroCasa(e.target.value)} placeholder="01"
               style={{ width:"100%", background:"#0f172a", border:"1px solid #334155", borderRadius:10, padding:"12px 14px", color:"#f1f5f9", fontSize:14, outline:"none", boxSizing:"border-box" }} />
           </div>
         </div>
-        {form.quadra && form.numero_casa && (
+        {quadra && numeroCasa && (
           <div style={{ background:"#38bdf815", border:"1px solid #38bdf833", borderRadius:10, padding:"10px 14px", marginTop:16, color:"#38bdf8", fontSize:13 }}>
-            ID da Casa: <strong>{form.quadra.toUpperCase()}-{form.numero_casa}</strong>
+            ID da Casa: <strong>{quadra.toUpperCase()}-{numeroCasa}</strong>
           </div>
         )}
       </div>
