@@ -1,130 +1,246 @@
 import { useState, useEffect, useCallback } from "react";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
 // ============================================================
-// SUPABASE CLIENT
+// SUPABASE
 // ============================================================
 const SUPABASE_URL = "https://sjvvckvqlornvjevgvku.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNqdnZja3ZxbG9ybnZqZXZndmt1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1NzE1MjIsImV4cCI6MjA5MDE0NzUyMn0.-tpGD7qR-C2Kbz6q4zJKLaIcFABbThfvbYntFGmYDSc";
 
-const sb = async (path, options = {}) => {
+const sb = async (path, opts = {}) => {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-    headers: {
-      "apikey": SUPABASE_KEY,
-      "Authorization": `Bearer ${SUPABASE_KEY}`,
-      "Content-Type": "application/json",
-      "Prefer": options.prefer || "return=representation",
-      ...options.headers,
-    },
-    ...options,
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: opts.prefer || "return=representation", ...opts.headers },
+    ...opts,
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.message || "Erro Supabase");
-  }
-  const text = await res.text();
-  return text ? JSON.parse(text) : [];
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || "Erro Supabase"); }
+  const t = await res.text(); return t ? JSON.parse(t) : [];
 };
 
 const api = {
-  // Moradores
-  getMoradores: () => sb("moradores?order=casa_id.asc"),
-  addMorador: (data) => sb("moradores", { method: "POST", body: JSON.stringify(data) }),
-  updateMorador: (id, data) => sb(`moradores?id=eq.${id}`, { method: "PATCH", body: JSON.stringify(data) }),
-  deleteMorador: (id) => sb(`moradores?id=eq.${id}`, { method: "DELETE", prefer: "return=minimal" }),
-
-  // Pagamentos
-  getPagamentos: () => sb("pagamentos?order=created_at.desc"),
-  addPagamento: (data) => sb("pagamentos", { method: "POST", body: JSON.stringify(data) }),
-  deletePagamento: (id) => sb(`pagamentos?id=eq.${id}`, { method: "DELETE", prefer: "return=minimal" }),
-
-  // Financeiro
-  getFinanceiro: () => sb("financeiro?order=data.desc"),
-  addFinanceiro: (data) => sb("financeiro", { method: "POST", body: JSON.stringify(data) }),
-  deleteFinanceiro: (id) => sb(`financeiro?id=eq.${id}`, { method: "DELETE", prefer: "return=minimal" }),
+  getMoradores:    ()      => sb("moradores?order=casa_id.asc"),
+  addMorador:      (d)     => sb("moradores", { method: "POST", body: JSON.stringify(d) }),
+  updateMorador:   (id, d) => sb(`moradores?id=eq.${id}`, { method: "PATCH", body: JSON.stringify(d) }),
+  deleteMorador:   (id)    => sb(`moradores?id=eq.${id}`, { method: "DELETE", prefer: "return=minimal" }),
+  getPagamentos:   ()      => sb("pagamentos?order=created_at.desc"),
+  addPagamento:    (d)     => sb("pagamentos", { method: "POST", body: JSON.stringify(d) }),
+  deletePagamento: (id)    => sb(`pagamentos?id=eq.${id}`, { method: "DELETE", prefer: "return=minimal" }),
+  getFinanceiro:   ()      => sb("financeiro?order=data.desc"),
+  addFinanceiro:   (d)     => sb("financeiro", { method: "POST", body: JSON.stringify(d) }),
+  deleteFinanceiro:(id)    => sb(`financeiro?id=eq.${id}`, { method: "DELETE", prefer: "return=minimal" }),
 };
 
 // ============================================================
-// TYPES & CONSTANTS
+// CONSTANTS & DESIGN TOKENS
 // ============================================================
-const STATUS_COLORS = {
-  pago:     { bg: "#10b981", light: "#d1fae5", text: "#065f46", label: "Pago" },
-  pendente: { bg: "#ef4444", light: "#fee2e2", text: "#991b1b", label: "Pendente" },
-  atrasado: { bg: "#f59e0b", light: "#fef3c7", text: "#92400e", label: "Atrasado" },
-  vazio:    { bg: "#6b7280", light: "#f3f4f6", text: "#374151", label: "Sem morador" },
+const C = {
+  bg: "#080e1a", card: "#0f1929", card2: "#162236",
+  border: "#1c2e45", border2: "#243652",
+  text: "#eef4ff", sub: "#7a9bbf", muted: "#3d5470",
+  accent: "#3b82f6", accentD: "#1d4ed8",
+  green: "#10b981", red: "#ef4444", yellow: "#f59e0b", purple: "#8b5cf6",
 };
-const FORMAS_PAG = ["pix", "dinheiro", "debito", "credito"];
+
+const STATUS = {
+  pago:     { bg: C.green,  dim: "#10b98120", border: "#10b98140", label: "Pago",     emoji: "✅" },
+  pendente: { bg: C.yellow, dim: "#f59e0b20", border: "#f59e0b40", label: "Pendente", emoji: "⏳" },
+};
+
+const FORMAS     = ["pix", "dinheiro", "debito", "credito"];
 const CATEGORIAS = ["fixo", "variavel", "emergencial", "outro"];
 
 // ============================================================
 // HELPERS
 // ============================================================
-const fmtMoeda = (v) => (v ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-const fmtData  = (s) => s ? new Date(s + (s.includes("T") ? "" : "T12:00:00")).toLocaleDateString("pt-BR") : "-";
-const capFirst = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+const R       = (v) => (v ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const fmtData = (s) => s ? new Date(s + (s.includes("T") ? "" : "T12:00:00")).toLocaleDateString("pt-BR") : "-";
+const cap     = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s;
+const up      = (s) => s ? s.trim().toUpperCase() : s;
 
-const buildMes = (date) => { const d = new Date(date); return `${String(d.getMonth()+1).padStart(2,"0")}-${d.getFullYear()}`; };
-const getMesAtual = () => buildMes(new Date());
-const parseMes = (mes) => { const [m,y] = mes.split("-"); return new Date(+y, +m-1, 1); };
-const navMes = (mes, delta) => { const d = parseMes(mes); d.setMonth(d.getMonth()+delta); return buildMes(d); };
-const formatMes = (mes) => { const [m,y] = mes.split("-"); return new Date(+y,+m-1,1).toLocaleDateString("pt-BR",{month:"long",year:"numeric"}); };
+const buildMes   = (d) => { const x = new Date(d); return `${String(x.getMonth() + 1).padStart(2, "0")}-${x.getFullYear()}`; };
+const getMesNow  = () => buildMes(new Date());
+const parseMes   = (m) => { const [mm, yy] = m.split("-"); return new Date(+yy, +mm - 1, 1); };
+const navMes     = (m, d) => { const x = parseMes(m); x.setMonth(x.getMonth() + d); return buildMes(x); };
+const fmtMes     = (m) => { const [mm, yy] = m.split("-"); return new Date(+yy, +mm - 1, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" }); };
+const fmtMesCurto= (m) => { const [mm, yy] = m.split("-"); return new Date(+yy, +mm - 1, 1).toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }); };
 
-const getStatusCasa = (casaId, mes, pagamentos) => {
-  const m = mes || getMesAtual();
-  if (pagamentos.some(p => p.casa_id === casaId && p.mes === m)) return "pago";
-  const ant = navMes(m, -1);
-  return pagamentos.some(p => p.casa_id === casaId && p.mes === ant) ? "pendente" : "atrasado";
+const getStatus = (casaId, mes, pagamentos) =>
+  pagamentos.some(p => p.casa_id === casaId && p.mes === (mes || getMesNow())) ? "pago" : "pendente";
+
+// ============================================================
+// VALIDAÇÕES
+// ============================================================
+const validarTel = (t) => /^\(?\d{2}\)?\s?\d{4,5}-?\d{4}$/.test(t.replace(/\s/g, ""));
+const validarCPF = (c) => {
+  if (!c || !c.trim()) return true;
+  const n = c.replace(/\D/g, "");
+  if (n.length !== 11 || /^(\d)\1+$/.test(n)) return false;
+  let s = 0; for (let i = 0; i < 9; i++) s += +n[i] * (10 - i);
+  let r = 11 - (s % 11); if (r >= 10) r = 0; if (r !== +n[9]) return false;
+  s = 0; for (let i = 0; i < 10; i++) s += +n[i] * (11 - i);
+  r = 11 - (s % 11); if (r >= 10) r = 0; return r === +n[10];
+};
+const maskTel = (v) => {
+  const n = v.replace(/\D/g, "").slice(0, 11);
+  if (n.length <= 2) return n;
+  if (n.length <= 6) return `(${n.slice(0, 2)}) ${n.slice(2)}`;
+  if (n.length <= 10) return `(${n.slice(0, 2)}) ${n.slice(2, 6)}-${n.slice(6)}`;
+  return `(${n.slice(0, 2)}) ${n.slice(2, 7)}-${n.slice(7)}`;
+};
+const maskCPF = (v) => {
+  const n = v.replace(/\D/g, "").slice(0, 11);
+  if (n.length <= 3) return n;
+  if (n.length <= 6) return `${n.slice(0, 3)}.${n.slice(3)}`;
+  if (n.length <= 9) return `${n.slice(0, 3)}.${n.slice(3, 6)}.${n.slice(6)}`;
+  return `${n.slice(0, 3)}.${n.slice(3, 6)}.${n.slice(6, 9)}-${n.slice(9)}`;
+};
+
+// WhatsApp
+const waLink = (tel, nome, mes) => {
+  const n = tel.replace(/\D/g, "");
+  const fone = n.startsWith("55") ? n : `55${n}`;
+  const msg = encodeURIComponent(`Olá Sr. ${cap(nome)}, tudo bem?
+
+Referente ao Condomínio Boa Esperança, identificamos que a mensalidade de ${cap(fmtMes(mes))} encontra-se em aberto.
+
+Para sua comodidade, o pagamento pode ser realizado via PIX:
+
+🔑 Chave PIX: [SUA_CHAVE_AQUI]
+
+Solicitamos, por gentileza, a regularização o quanto antes para evitar possíveis encargos.
+
+Caso já tenha efetuado o pagamento, pedimos que desconsidere esta mensagem.
+
+Atenciosamente,
+Administração
+Condomínio Boa Esperança 🏘️
+`);
+  return `https://wa.me/${fone}?text=${msg}`;
 };
 
 // ============================================================
-// ICONS
+// COMPONENTES BASE
 // ============================================================
-const Icon = ({ name, size = 20, color = "currentColor" }) => {
-  const paths = {
-    home:       "M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z",
-    building:   "M1 21h22M5 21V7l7-4 7 4v14M9 21v-4h6v4",
-    plus:       "M12 5v14M5 12h14",
-    wallet:     "M21 12V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5M16 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
-    chart:      "M18 20V10M12 20V4M6 20v-6",
-    arrow_l:    "M15 18l-6-6 6-6",
-    arrow_r:    "M9 18l6-6-6-6",
-    arrow_up:   "M12 19V5M5 12l7-7 7 7",
-    arrow_down: "M12 5v14M19 12l-7 7-7-7",
-    check:      "M20 6L9 17l-5-5",
-    edit:       "M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z",
-    trash:      "M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2",
-    search:     "M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z",
-    user:       "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z",
-    filter:     "M22 3H2l8 9.46V19l4 2v-8.54L22 3z",
-    x:          "M18 6L6 18M6 6l12 12",
-    dollar:     "M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6",
-    refresh:    "M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15",
+
+// Spinner inline
+const SI = () => (
+  <div style={{ width: 14, height: 14, border: "2px solid rgba(255,255,255,.3)", borderTop: "2px solid #fff", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+);
+
+// Botão
+const Btn = ({ children, onClick, v = "primary", sz = "md", loading = false, disabled = false, full = false, sx = {} }) => {
+  const VS = {
+    primary:  { background: `linear-gradient(135deg,${C.accent},${C.accentD})`, color: "#fff", border: "none" },
+    success:  { background: `linear-gradient(135deg,${C.green},#059669)`, color: "#fff", border: "none" },
+    danger:   { background: `${C.red}18`, color: "#f87171", border: `1px solid ${C.red}33` },
+    ghost:    { background: "transparent", color: C.sub, border: `1px solid ${C.border2}` },
+    whatsapp: { background: "linear-gradient(135deg,#25d366,#128c7e)", color: "#fff", border: "none" },
+  };
+  const SZ = {
+    sm: { padding: "6px 12px", fontSize: 12, borderRadius: 8 },
+    md: { padding: "11px 18px", fontSize: 14, borderRadius: 12 },
+    lg: { padding: "14px 20px", fontSize: 15, borderRadius: 14 },
   };
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d={paths[name]} />
+    <button onClick={onClick} disabled={disabled || loading}
+      style={{ ...VS[v], ...SZ[sz], fontWeight: 700, cursor: (disabled || loading) ? "default" : "pointer", opacity: (disabled || loading) ? .6 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: full ? "100%" : "auto", fontFamily: "inherit", transition: "opacity .15s", ...sx }}>
+      {loading ? <><SI /> Salvando...</> : children}
+    </button>
+  );
+};
+
+// Input
+const Inp = ({ label, value, onChange, placeholder, type = "text", err, required, hint, ...rest }) => (
+  <div style={{ marginBottom: 14 }}>
+    {label && <label style={{ color: C.sub, fontSize: 11, fontWeight: 700, display: "block", marginBottom: 6, textTransform: "uppercase", letterSpacing: .6 }}>
+      {label}{required && <span style={{ color: C.red }}> *</span>}
+    </label>}
+    <input type={type} value={value} onChange={onChange} placeholder={placeholder}
+      style={{ width: "100%", background: C.card, border: `1.5px solid ${err ? C.red : C.border2}`, borderRadius: 12, padding: "11px 13px", color: C.text, fontSize: 14, outline: "none", boxSizing: "border-box", fontFamily: "inherit" }}
+      onFocus={e => { if (!err) e.target.style.borderColor = C.accent; }}
+      onBlur={e => { if (!err) e.target.style.borderColor = C.border2; }}
+      {...rest} />
+    {err  && <div style={{ color: C.red,   fontSize: 11, marginTop: 4 }}>⚠ {err}</div>}
+    {hint && !err && <div style={{ color: C.muted, fontSize: 11, marginTop: 4 }}>{hint}</div>}
+  </div>
+);
+
+// Card
+const Crd = ({ children, sx = {} }) => (
+  <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 18, padding: 20, ...sx }}>{children}</div>
+);
+
+// Status badge
+const SBadge = ({ status, lg = false }) => {
+  const s = STATUS[status] || STATUS.pendente;
+  return (
+    <span style={{ background: s.dim, color: s.bg, border: `1px solid ${s.border}`, borderRadius: 20, padding: lg ? "6px 14px" : "3px 9px", fontSize: lg ? 13 : 11, fontWeight: 700, whiteSpace: "nowrap" }}>
+      {s.emoji} {s.label}
+    </span>
+  );
+};
+
+// Ícones
+const Ic = ({ n, sz = 20, c = "currentColor" }) => {
+  const P = {
+    home:  "M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z",
+    bldg:  "M1 21h22M5 21V7l7-4 7 4v14M9 21v-4h6v4",
+    plus:  "M12 5v14M5 12h14",
+    wlt:   "M21 12V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5M16 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
+    chrt:  "M18 20V10M12 20V4M6 20v-6",
+    al:    "M15 18l-6-6 6-6",
+    ar:    "M9 18l6-6-6-6",
+    aup:   "M12 19V5M5 12l7-7 7 7",
+    adn:   "M12 5v14M19 12l-7 7-7-7",
+    chk:   "M20 6L9 17l-5-5",
+    edt:   "M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z",
+    trs:   "M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2",
+    srch:  "M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z",
+    usr:   "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z",
+    flt:   "M22 3H2l8 9.46V19l4 2v-8.54L22 3z",
+    ph:    "M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.88 9.5a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.99 0h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6.08 6.08l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z",
+    dlr:   "M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6",
+    bll:   "M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0",
+  };
+  return (
+    <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d={P[n] || ""} />
     </svg>
   );
 };
 
-// ============================================================
-// TOAST
-// ============================================================
+// Toast
 const ToastList = ({ toasts }) => (
-  <div style={{ position:"fixed", bottom:80, left:"50%", transform:"translateX(-50%)", zIndex:9999, display:"flex", flexDirection:"column", gap:8, pointerEvents:"none", width:"90%", maxWidth:380 }}>
+  <div style={{ position: "fixed", bottom: 72, left: "50%", transform: "translateX(-50%)", zIndex: 9999, display: "flex", flexDirection: "column", gap: 8, width: "92%", maxWidth: 420, pointerEvents: "none" }}>
     {toasts.map(t => (
-      <div key={t.id} style={{ background: t.type==="error" ? "#fee2e2" : "#d1fae5", color: t.type==="error" ? "#991b1b" : "#065f46", padding:"12px 16px", borderRadius:12, fontSize:14, fontWeight:500, boxShadow:"0 4px 20px rgba(0,0,0,.15)", animation:"slideUp .3s ease" }}>
+      <div key={t.id} style={{
+        background: t.type === "error" ? "#1c0a0a" : t.type === "warn" ? "#1a1400" : "#091a10",
+        border: `1.5px solid ${t.type === "error" ? C.red : t.type === "warn" ? C.yellow : C.green}`,
+        color: t.type === "error" ? "#fca5a5" : t.type === "warn" ? "#fde68a" : "#86efac",
+        padding: "13px 16px", borderRadius: 14, fontSize: 13, fontWeight: 600,
+        boxShadow: "0 8px 32px rgba(0,0,0,.6)", animation: "slideUp .25s ease",
+        display: "flex", alignItems: "center", gap: 10,
+      }}>
+        <span style={{ fontSize: 15 }}>{t.type === "error" ? "❌" : t.type === "warn" ? "⚠️" : "✅"}</span>
         {t.msg}
       </div>
     ))}
   </div>
 );
 
-// ============================================================
-// LOADING
-// ============================================================
+// Spinner de tela
 const Spinner = () => (
-  <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:200 }}>
-    <div style={{ width:36, height:36, border:"3px solid #1e293b", borderTop:"3px solid #38bdf8", borderRadius:"50%", animation:"spin 1s linear infinite" }} />
+  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "60vh", gap: 16 }}>
+    <div style={{ width: 38, height: 38, border: `3px solid ${C.border2}`, borderTop: `3px solid ${C.accent}`, borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+    <div style={{ color: C.muted, fontSize: 13 }}>Carregando...</div>
+  </div>
+);
+
+// NavMes
+const NavMes = ({ mes, setMes }) => (
+  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: "10px 16px" }}>
+    <button onClick={() => setMes(navMes(mes, -1))} style={{ background: "none", border: "none", color: C.accent, cursor: "pointer", padding: 4, display: "flex" }}><Ic n="al" sz={18} c={C.accent} /></button>
+    <span style={{ color: C.text, fontWeight: 700, fontSize: 14 }}>📅 {cap(fmtMes(mes))}</span>
+    <button onClick={() => setMes(navMes(mes, 1))}  style={{ background: "none", border: "none", color: C.accent, cursor: "pointer", padding: 4, display: "flex" }}><Ic n="ar" sz={18} c={C.accent} /></button>
   </div>
 );
 
@@ -133,18 +249,27 @@ const Spinner = () => (
 // ============================================================
 const BottomNav = ({ page, setPage }) => {
   const tabs = [
-    { id:"dashboard", icon:"home",     label:"Início"    },
-    { id:"casas",     icon:"building", label:"Casas"     },
-    { id:"cadastro",  icon:"plus",     label:"Cadastro"  },
-    { id:"financeiro",icon:"wallet",   label:"Financeiro"},
-    { id:"relatorios",icon:"chart",    label:"Relatórios"},
+    { id: "dashboard", ic: "home", lb: "Início" },
+    { id: "casas",     ic: "bldg", lb: "Casas"  },
+    { id: "cadastro",  ic: "plus", lb: ""        },
+    { id: "financeiro",ic: "wlt",  lb: "Financ." },
+    { id: "relatorios",ic: "chrt", lb: "Relat."  },
   ];
   return (
-    <nav style={{ position:"fixed", bottom:0, left:0, right:0, background:"#0f172a", borderTop:"1px solid #1e293b", display:"flex", zIndex:100, height:64, maxWidth:480, margin:"0 auto" }}>
+    <nav style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 480, background: C.card, borderTop: `1px solid ${C.border}`, display: "flex", zIndex: 200, height: 62 }}>
       {tabs.map(t => (
-        <button key={t.id} onClick={() => setPage(t.id)} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:2, border:"none", background:"none", cursor:"pointer", color: page===t.id ? "#38bdf8" : "#64748b", transition:"color .2s", padding:0 }}>
-          <Icon name={t.icon} size={20} color={page===t.id ? "#38bdf8" : "#64748b"} />
-          <span style={{ fontSize:10, fontWeight: page===t.id ? 700 : 400, letterSpacing:.3 }}>{t.label}</span>
+        <button key={t.id} onClick={() => setPage(t.id)}
+          style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2, border: "none", background: "none", cursor: "pointer", color: page === t.id ? C.accent : C.muted, padding: 0, fontFamily: "inherit", position: "relative" }}>
+          {t.id === "cadastro"
+            ? <div style={{ width: 42, height: 42, borderRadius: "50%", background: `linear-gradient(135deg,${C.accent},${C.accentD})`, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 4px 14px ${C.accent}55`, marginTop: -10 }}>
+                <Ic n="plus" sz={20} c="#fff" />
+              </div>
+            : <>
+                <Ic n={t.ic} sz={19} c={page === t.id ? C.accent : C.muted} />
+                <span style={{ fontSize: 9, fontWeight: page === t.id ? 700 : 400 }}>{t.lb}</span>
+                {page === t.id && <div style={{ position: "absolute", bottom: 0, width: 18, height: 2, background: C.accent, borderRadius: 2 }} />}
+              </>
+          }
         </button>
       ))}
     </nav>
@@ -154,21 +279,27 @@ const BottomNav = ({ page, setPage }) => {
 // ============================================================
 // HOUSE CARD
 // ============================================================
-const HouseCard = ({ morador, status, onClick }) => {
-  const s = STATUS_COLORS[status] || STATUS_COLORS.vazio;
+const HouseCard = ({ morador, status, onClick, onWA }) => {
+  const s = STATUS[status] || STATUS.pendente;
   return (
-    <button onClick={onClick} style={{ width:"100%", background:"#1e293b", border:`1px solid ${s.bg}33`, borderRadius:16, padding:"14px 16px", display:"flex", alignItems:"center", gap:14, cursor:"pointer", textAlign:"left", transition:"transform .15s, box-shadow .15s" }}
-      onMouseEnter={e => { e.currentTarget.style.transform="translateY(-2px)"; e.currentTarget.style.boxShadow=`0 8px 24px ${s.bg}22`; }}
-      onMouseLeave={e => { e.currentTarget.style.transform="translateY(0)"; e.currentTarget.style.boxShadow="none"; }}>
-      <div style={{ width:42, height:42, borderRadius:12, background:`${s.bg}22`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-        <span style={{ fontSize:18 }}>🏠</span>
+    <div onClick={onClick} style={{ background: C.card, border: `1px solid ${s.border}`, borderRadius: 16, padding: "13px 15px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", transition: "all .15s" }}
+      onMouseEnter={e => { e.currentTarget.style.background = C.card2; }}
+      onMouseLeave={e => { e.currentTarget.style.background = C.card; }}>
+      <div style={{ width: 42, height: 42, borderRadius: 12, background: s.dim, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>🏠</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ color: C.text, fontWeight: 700, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{cap(morador.nome)}</div>
+        <div style={{ color: C.sub, fontSize: 12, marginTop: 2 }}>Casa {morador.casa_id}</div>
       </div>
-      <div style={{ flex:1, minWidth:0 }}>
-        <div style={{ color:"#f1f5f9", fontWeight:600, fontSize:15, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{morador.nome}</div>
-        <div style={{ color:"#94a3b8", fontSize:12, marginTop:2 }}>Casa {morador.casa_id}</div>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
+        <SBadge status={status} />
+        {status !== "pago" && morador.telefone && (
+          <button onClick={e => { e.stopPropagation(); onWA(); }}
+            style={{ background: "#25d36618", color: "#25d366", border: "1px solid #25d36635", borderRadius: 7, padding: "3px 8px", fontSize: 10, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 3 }}>
+            <Ic n="ph" sz={10} c="#25d366" /> Cobrar
+          </button>
+        )}
       </div>
-      <div style={{ background:`${s.bg}22`, color:s.bg, border:`1px solid ${s.bg}55`, borderRadius:8, padding:"4px 10px", fontSize:11, fontWeight:700, flexShrink:0 }}>{s.label}</div>
-    </button>
+    </div>
   );
 };
 
@@ -176,48 +307,124 @@ const HouseCard = ({ morador, status, onClick }) => {
 // DASHBOARD
 // ============================================================
 const Dashboard = ({ moradores, pagamentos, financeiro }) => {
-  const mesAtual = getMesAtual();
-  const inadimplentes = moradores.filter(m => getStatusCasa(m.casa_id, mesAtual, pagamentos) !== "pago").length;
-  const pagos = moradores.filter(m => getStatusCasa(m.casa_id, mesAtual, pagamentos) === "pago").length;
-  const recebidoMes = pagamentos.filter(p => p.mes === mesAtual).reduce((a,p) => a+p.valor, 0);
-  const saldo = pagamentos.reduce((a,p)=>a+p.valor,0) + financeiro.filter(f=>f.tipo==="entrada").reduce((a,f)=>a+f.valor,0) - financeiro.filter(f=>f.tipo==="saida").reduce((a,f)=>a+f.valor,0);
+  const mes         = getMesNow();
+  const inadimp     = moradores.filter(m => getStatus(m.casa_id, mes, pagamentos) !== "pago");
+  const pagos       = moradores.filter(m => getStatus(m.casa_id, mes, pagamentos) === "pago");
+  const recMes      = pagamentos.filter(p => p.mes === mes).reduce((a, p) => a + p.valor, 0);
+  const totalRec    = pagamentos.reduce((a, p) => a + p.valor, 0);
+  const totalEntradas = financeiro.filter(f => f.tipo === "entrada").reduce((a, f) => a + f.valor, 0);
+  const totalSaidas = financeiro.filter(f => f.tipo === "saida").reduce((a, f) => a + f.valor, 0);
+  const saldo       = totalRec + totalEntradas - totalSaidas;
+  const pct         = moradores.length ? Math.round((pagos.length / moradores.length) * 100) : 0;
 
-  const Card = ({ label, value, color, icon, sub }) => (
-    <div style={{ background:"#1e293b", borderRadius:16, padding:"18px 20px", border:`1px solid ${color}33` }}>
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
-        <div>
-          <div style={{ color:"#94a3b8", fontSize:12, fontWeight:500, textTransform:"uppercase", letterSpacing:1 }}>{label}</div>
-          <div style={{ color, fontSize:22, fontWeight:800, marginTop:6 }}>{value}</div>
-          {sub && <div style={{ color:"#64748b", fontSize:11, marginTop:4 }}>{sub}</div>}
-        </div>
-        <div style={{ background:`${color}15`, borderRadius:10, padding:10 }}>
-          <Icon name={icon} size={20} color={color} />
-        </div>
-      </div>
-    </div>
-  );
+  const ultimos6    = Array.from({ length: 6 }, (_, i) => navMes(mes, -(5 - i)));
+  const dataBarras  = ultimos6.map(m => ({
+    mes:      fmtMesCurto(m),
+    Pagos:    moradores.filter(mo => getStatus(mo.casa_id, m, pagamentos) === "pago").length,
+    Pendentes:moradores.filter(mo => getStatus(mo.casa_id, m, pagamentos) !== "pago").length,
+    Receita:  pagamentos.filter(p => p.mes === m).reduce((a, p) => a + p.valor, 0),
+  }));
 
   return (
-    <div style={{ padding:"20px 16px", paddingBottom:80 }}>
-      <div style={{ marginBottom:24 }}>
-        <div style={{ color:"#94a3b8", fontSize:13 }}>Bem-vindo ao</div>
-        <h1 style={{ color:"#f1f5f9", fontSize:24, fontWeight:800, margin:"4px 0" }}>Gestão Condomínio</h1>
-        <div style={{ color:"#38bdf8", fontSize:13 }}>{capFirst(formatMes(mesAtual))}</div>
+    <div style={{ padding: "20px 16px 88px" }}>
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ color: C.muted, fontSize: 11, textTransform: "uppercase", letterSpacing: 1, fontWeight: 700 }}>Painel do Gestor</div>
+        <h1 style={{ color: C.text, fontSize: 26, fontWeight: 900, margin: "4px 0 2px" }}>Condomínio</h1>
+        <div style={{ color: C.accent, fontSize: 13, fontWeight: 600 }}>📅 {cap(fmtMes(mes))}</div>
       </div>
-      <div style={{ background:"linear-gradient(135deg,#0ea5e9,#2563eb)", borderRadius:20, padding:"24px", marginBottom:20, position:"relative", overflow:"hidden" }}>
-        <div style={{ position:"absolute", top:-20, right:-20, width:100, height:100, borderRadius:"50%", background:"rgba(255,255,255,.08)" }} />
-        <div style={{ color:"rgba(255,255,255,.8)", fontSize:13, fontWeight:500 }}>Saldo Total</div>
-        <div style={{ color:"#fff", fontSize:32, fontWeight:900, marginTop:4 }}>{fmtMoeda(saldo)}</div>
-        <div style={{ color:"rgba(255,255,255,.6)", fontSize:12, marginTop:6 }}>Pagamentos + Entradas − Saídas</div>
+
+      {/* Saldo */}
+      <div style={{ background: "linear-gradient(135deg,#1d4ed8,#0284c7)", borderRadius: 20, padding: "22px 22px", marginBottom: 14, position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: -30, right: -30, width: 120, height: 120, borderRadius: "50%", background: "rgba(255,255,255,.05)" }} />
+        <div style={{ color: "rgba(255,255,255,.7)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>Saldo Total Acumulado</div>
+        <div style={{ color: "#fff", fontSize: 32, fontWeight: 900, margin: "6px 0 4px", letterSpacing: -1 }}>{R(saldo)}</div>
+        <div style={{ color: "rgba(255,255,255,.55)", fontSize: 11 }}>Receitas ({R(totalRec + totalEntradas)}) − Despesas ({R(totalSaidas)})</div>
       </div>
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:12 }}>
-        <Card label="Casas"        value={moradores.length} color="#38bdf8" icon="building" sub="cadastradas" />
-        <Card label="Inadimplentes" value={inadimplentes}   color="#f87171" icon="user"     sub="neste mês"   />
+
+      {/* KPI Cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+        {[
+          { lb: "Casas",         val: moradores.length,  color: C.accent,  ic: "bldg", sub: "cadastradas"     },
+          { lb: "Inadimplentes", val: inadimp.length,    color: C.red,     ic: "bll",  sub: "neste mês"        },
+          { lb: "Pagos",         val: `${pagos.length}`, color: C.green,   ic: "chk",  sub: `${pct}% do total` },
+          { lb: "Arrecadado",    val: R(recMes),         color: C.purple,  ic: "dlr",  sub: "em mensalidades"  },
+        ].map(c => (
+          <Crd key={c.lb} sx={{ border: `1px solid ${c.color}20`, padding: "14px 16px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div>
+                <div style={{ color: C.muted, fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: .8, marginBottom: 6 }}>{c.lb}</div>
+                <div style={{ color: c.color, fontSize: 20, fontWeight: 900 }}>{c.val}</div>
+                <div style={{ color: C.muted, fontSize: 10, marginTop: 3 }}>{c.sub}</div>
+              </div>
+              <div style={{ background: `${c.color}15`, borderRadius: 9, padding: 8 }}><Ic n={c.ic} sz={17} c={c.color} /></div>
+            </div>
+          </Crd>
+        ))}
       </div>
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
-        <Card label="Pagos"    value={pagos}              color="#34d399" icon="check"  sub="neste mês"       />
-        <Card label="Recebido" value={fmtMoeda(recebidoMes)} color="#a78bfa" icon="dollar" sub="em pagamentos" />
-      </div>
+
+      {/* Barra adimplência */}
+      <Crd sx={{ marginBottom: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+          <span style={{ color: C.text, fontWeight: 700, fontSize: 13 }}>Adimplência do Mês</span>
+          <span style={{ color: pct >= 70 ? C.green : pct >= 40 ? C.yellow : C.red, fontWeight: 800, fontSize: 15 }}>{pct}%</span>
+        </div>
+        <div style={{ background: C.border, borderRadius: 99, height: 7, overflow: "hidden" }}>
+          <div style={{ background: `linear-gradient(90deg,${C.green},#34d399)`, height: "100%", width: `${pct}%`, borderRadius: 99 }} />
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 7 }}>
+          <span style={{ color: C.green, fontSize: 11 }}>✅ {pagos.length} pagos</span>
+          <span style={{ color: C.red, fontSize: 11 }}>⏳ {inadimp.length} pendentes</span>
+        </div>
+      </Crd>
+
+      {/* Gráfico Receita */}
+      <Crd sx={{ marginBottom: 12 }}>
+        <div style={{ color: C.text, fontWeight: 700, fontSize: 13, marginBottom: 14 }}>📈 Receita Mensal (últimos 6 meses)</div>
+        <ResponsiveContainer width="100%" height={150}>
+          <BarChart data={dataBarras} margin={{ top: 0, right: 0, bottom: 0, left: -25 }}>
+            <XAxis dataKey="mes" tick={{ fill: C.muted, fontSize: 10 }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fill: C.muted, fontSize: 9 }} axisLine={false} tickLine={false} tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} />
+            <Tooltip formatter={v => [R(v), "Receita"]} contentStyle={{ background: C.card2, border: `1px solid ${C.border2}`, borderRadius: 10, color: C.text, fontSize: 12 }} cursor={{ fill: `${C.accent}10` }} />
+            <Bar dataKey="Receita" fill={C.accent} radius={[5, 5, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </Crd>
+
+      {/* Gráfico Adimplência */}
+      <Crd sx={{ marginBottom: 12 }}>
+        <div style={{ color: C.text, fontWeight: 700, fontSize: 13, marginBottom: 14 }}>📊 Pagos vs Pendentes</div>
+        <ResponsiveContainer width="100%" height={150}>
+          <BarChart data={dataBarras} margin={{ top: 0, right: 0, bottom: 0, left: -25 }}>
+            <XAxis dataKey="mes" tick={{ fill: C.muted, fontSize: 10 }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fill: C.muted, fontSize: 9 }} axisLine={false} tickLine={false} />
+            <Tooltip contentStyle={{ background: C.card2, border: `1px solid ${C.border2}`, borderRadius: 10, color: C.text, fontSize: 12 }} />
+            <Bar dataKey="Pagos"     fill={C.green}  radius={[4, 4, 0, 0]} />
+            <Bar dataKey="Pendentes" fill={C.yellow} radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </Crd>
+
+      {/* Lista inadimplentes */}
+      {inadimp.length > 0 && (
+        <Crd>
+          <div style={{ color: C.text, fontWeight: 700, fontSize: 13, marginBottom: 12 }}>⏳ Pendentes — {cap(fmtMes(mes))}</div>
+          {inadimp.slice(0, 6).map((m, i) => (
+            <div key={m.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderBottom: i < Math.min(inadimp.length, 6) - 1 ? `1px solid ${C.border}` : "none" }}>
+              <div>
+                <div style={{ color: C.text, fontSize: 13, fontWeight: 600 }}>{cap(m.nome)}</div>
+                <div style={{ color: C.muted, fontSize: 11 }}>Casa {m.casa_id}</div>
+              </div>
+              {m.telefone && (
+                <a href={waLink(m.telefone, m.nome, mes)} target="_blank" rel="noreferrer"
+                  style={{ background: "#25d36618", color: "#25d366", border: "1px solid #25d36635", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 700, textDecoration: "none", display: "flex", alignItems: "center", gap: 4 }}>
+                  <Ic n="ph" sz={11} c="#25d366" /> WhatsApp
+                </a>
+              )}
+            </div>
+          ))}
+          {inadimp.length > 6 && <div style={{ color: C.muted, fontSize: 11, textAlign: "center", marginTop: 10 }}>+{inadimp.length - 6} outros pendentes</div>}
+        </Crd>
+      )}
     </div>
   );
 };
@@ -226,95 +433,50 @@ const Dashboard = ({ moradores, pagamentos, financeiro }) => {
 // CASAS
 // ============================================================
 const Casas = ({ moradores, pagamentos, setPage, setSelectedCasa }) => {
-  const [mes, setMes] = useState(getMesAtual());
-  const [busca, setBusca] = useState("");
-  const [filtroStatus, setFiltroStatus] = useState("todos");
+  const [mes, setMes]             = useState(getMesNow());
+  const [busca, setBusca]         = useState("");
+  const [filtroSt, setFiltroSt]   = useState("todos");
 
-  // Calcula status de todos primeiro
-  const moradoresComStatus = moradores.map(m => ({
-    ...m,
-    status: getStatusCasa(m.casa_id, mes, pagamentos),
-  }));
-
-  // Counts para os badges (antes do filtro de status, mas depois da busca)
-  const buscados = moradoresComStatus.filter(m =>
-    m.nome.toLowerCase().includes(busca.toLowerCase()) ||
-    m.casa_id.toLowerCase().includes(busca.toLowerCase())
-  );
-  const counts = { pago:0, pendente:0, atrasado:0 };
-  buscados.forEach(m => { if (counts[m.status] !== undefined) counts[m.status]++; });
-
-  // Lista final com filtro de status aplicado
-  const filtrados = buscados.filter(m =>
-    filtroStatus === "todos" ? true : m.status === filtroStatus
-  );
-
-  const statusBtns = [
-    { key:"todos",    label:"Todos",    color:"#38bdf8" },
-    { key:"pago",     label:"Pagos",    color:STATUS_COLORS.pago.bg     },
-    { key:"pendente", label:"Pendente", color:STATUS_COLORS.pendente.bg },
-    { key:"atrasado", label:"Atrasado", color:STATUS_COLORS.atrasado.bg },
-  ];
+  const comSt   = moradores.map(m => ({ ...m, st: getStatus(m.casa_id, mes, pagamentos) })).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+  const buscados = comSt.filter(m => m.nome.toLowerCase().includes(busca.toLowerCase()) || m.casa_id.toLowerCase().includes(busca.toLowerCase()));
+  const counts  = { pago: 0, pendente: 0 };
+  buscados.forEach(m => { if (counts[m.st] !== undefined) counts[m.st]++; });
+  const lista   = filtroSt === "todos" ? buscados : buscados.filter(m => m.st === filtroSt);
 
   return (
-    <div style={{ padding:"20px 16px", paddingBottom:80 }}>
-      <h1 style={{ color:"#f1f5f9", fontSize:22, fontWeight:800, marginBottom:16 }}>Casas</h1>
+    <div style={{ padding: "20px 16px 88px" }}>
+      <h1 style={{ color: C.text, fontSize: 22, fontWeight: 900, marginBottom: 14 }}>🏘️ Casas</h1>
+      <div style={{ marginBottom: 10 }}><NavMes mes={mes} setMes={setMes} /></div>
 
-      {/* Navegação de mês */}
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", background:"#1e293b", borderRadius:14, padding:"10px 16px", marginBottom:16 }}>
-        <button onClick={() => setMes(navMes(mes,-1))} style={{ background:"none", border:"none", color:"#38bdf8", cursor:"pointer", padding:4 }}><Icon name="arrow_l" size={18} color="#38bdf8" /></button>
-        <span style={{ color:"#f1f5f9", fontWeight:700, fontSize:14 }}>{capFirst(formatMes(mes))}</span>
-        <button onClick={() => setMes(navMes(mes,1))}  style={{ background:"none", border:"none", color:"#38bdf8", cursor:"pointer", padding:4 }}><Icon name="arrow_r" size={18} color="#38bdf8" /></button>
+      <div style={{ position: "relative", marginBottom: 10 }}>
+        <div style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }}><Ic n="srch" sz={15} c={C.muted} /></div>
+        <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar por nome ou casa..."
+          style={{ width: "100%", background: C.card, border: `1px solid ${C.border2}`, borderRadius: 12, padding: "10px 12px 10px 38px", color: C.text, fontSize: 14, outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
       </div>
 
-      {/* Busca */}
-      <div style={{ position:"relative", marginBottom:12 }}>
-        <div style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)" }}><Icon name="search" size={16} color="#64748b" /></div>
-        <input
-          value={busca}
-          onChange={e => setBusca(e.target.value)}
-          placeholder="Buscar por nome ou casa..."
-          style={{ width:"100%", background:"#1e293b", border:"1px solid #334155", borderRadius:12, padding:"11px 12px 11px 38px", color:"#f1f5f9", fontSize:14, outline:"none", boxSizing:"border-box" }}
-        />
-      </div>
-
-      {/* Badges de contagem — clicáveis como filtro */}
-      <div style={{ display:"flex", gap:8, marginBottom:12 }}>
-        {Object.entries(counts).map(([k,v]) => {
-          const ativo = filtroStatus === k;
-          return (
-            <button key={k} onClick={() => setFiltroStatus(filtroStatus === k ? "todos" : k)}
-              style={{ flex:1, background: ativo ? `${STATUS_COLORS[k].bg}30` : `${STATUS_COLORS[k].bg}10`, border:`1.5px solid ${ativo ? STATUS_COLORS[k].bg : STATUS_COLORS[k].bg+"33"}`, borderRadius:10, padding:"8px 0", textAlign:"center", cursor:"pointer", transition:"all .15s" }}>
-              <div style={{ color:STATUS_COLORS[k].bg, fontWeight:800, fontSize:18 }}>{v}</div>
-              <div style={{ color:STATUS_COLORS[k].bg, fontSize:10, fontWeight:600 }}>{STATUS_COLORS[k].label}</div>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Filtro de status por botões de texto */}
-      <div style={{ display:"flex", gap:6, marginBottom:16, flexWrap:"wrap" }}>
-        {statusBtns.map(b => (
-          <button key={b.key} onClick={() => setFiltroStatus(b.key)}
-            style={{ padding:"6px 14px", borderRadius:20, border:`1.5px solid ${filtroStatus===b.key ? b.color : "#334155"}`, background: filtroStatus===b.key ? `${b.color}18` : "transparent", color: filtroStatus===b.key ? b.color : "#64748b", fontSize:12, fontWeight:600, cursor:"pointer", transition:"all .15s" }}>
-            {b.label} {b.key !== "todos" && `(${counts[b.key] ?? 0})`}
+      <div style={{ display: "flex", gap: 7, marginBottom: 14 }}>
+        {[
+          { k: "todos",    lb: `Todos (${buscados.length})`,         c: C.accent  },
+          { k: "pago",     lb: `✅ Pagos (${counts.pago})`,          c: C.green   },
+          { k: "pendente", lb: `⏳ Pendentes (${counts.pendente})`,  c: C.yellow  },
+        ].map(b => (
+          <button key={b.k} onClick={() => setFiltroSt(b.k)}
+            style={{ flex: 1, padding: "8px 4px", borderRadius: 10, border: `1.5px solid ${filtroSt === b.k ? b.c : C.border}`, background: filtroSt === b.k ? `${b.c}18` : "transparent", color: filtroSt === b.k ? b.c : C.muted, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+            {b.lb}
           </button>
         ))}
       </div>
 
-      {filtrados.length === 0 ? (
-        <div style={{ textAlign:"center", color:"#64748b", marginTop:60 }}>
-          <div style={{ fontSize:40, marginBottom:12 }}>🏘️</div>
-          <div>Nenhuma casa encontrada</div>
-        </div>
-      ) : (
-        <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-          {filtrados.map(m => (
-            <HouseCard key={m.id} morador={m} status={m.status}
-              onClick={() => { setSelectedCasa(m); setPage("casa_detalhe"); }} />
-          ))}
-        </div>
-      )}
+      {lista.length === 0
+        ? <div style={{ textAlign: "center", color: C.muted, marginTop: 60 }}><div style={{ fontSize: 40, marginBottom: 10 }}>🏘️</div>Nenhuma casa encontrada</div>
+        : <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+            {lista.map(m => (
+              <HouseCard key={m.id} morador={m} status={m.st}
+                onClick={() => { setSelectedCasa(m); setPage("casa_detalhe"); }}
+                onWA={() => window.open(waLink(m.telefone, m.nome, mes), "_blank")} />
+            ))}
+          </div>
+      }
     </div>
   );
 };
@@ -323,164 +485,171 @@ const Casas = ({ moradores, pagamentos, setPage, setSelectedCasa }) => {
 // CASA DETALHE
 // ============================================================
 const CasaDetalhe = ({ casa, pagamentos, setPage, toast, reload }) => {
-  const [editMode, setEditMode] = useState(false);
-  const [editData, setEditData] = useState({ ...casa });
-  const [showModal, setShowModal] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [pagForm, setPagForm] = useState({ valor:150, forma:"pix", mes:getMesAtual(), dataPagamento: new Date().toISOString().split("T")[0] });
+  const [edit, setEdit]         = useState(false);
+  const [ed, setEd]             = useState({ ...casa });
+  const [modal, setModal]       = useState(false);
+  const [saving, setSaving]     = useState(false);
+  const [pf, setPf]             = useState({ valor: 150, forma: "pix", mes: getMesNow(), dt: new Date().toISOString().split("T")[0] });
 
-  const pagsCasa = pagamentos.filter(p => p.casa_id === casa.casa_id).sort((a,b) => new Date(b.data_pagamento)-new Date(a.data_pagamento));
-  const statusAtual = getStatusCasa(casa.casa_id, null, pagamentos);
-  const s = STATUS_COLORS[statusAtual];
+  const pags    = pagamentos.filter(p => p.casa_id === casa.casa_id).sort((a, b) => new Date(b.data_pagamento) - new Date(a.data_pagamento));
+  const stNow   = getStatus(casa.casa_id, null, pagamentos);
+  const s       = STATUS[stNow];
 
-  const handleSaveEdit = async () => {
-    if (!editData.nome || !editData.telefone || !editData.quadra || !editData.numero_casa) { toast("Preencha todos os campos","error"); return; }
-    setLoading(true);
+  const salvarEdit = async () => {
+    if (!ed.nome || !ed.telefone || !ed.quadra || !ed.numero_casa) { toast("Preencha todos os campos obrigatórios", "error"); return; }
+    setSaving(true);
     try {
-      await api.updateMorador(casa.id, { nome:editData.nome, telefone:editData.telefone, cpf:editData.cpf, quadra:editData.quadra.toUpperCase(), numero_casa:editData.numero_casa, casa_id:`${editData.quadra.toUpperCase()}-${editData.numero_casa}` });
-      await reload();
-      setEditMode(false);
-      toast("Dados atualizados!");
-    } catch { toast("Erro ao atualizar","error"); } finally { setLoading(false); }
+      await api.updateMorador(casa.id, { nome: up(ed.nome), telefone: ed.telefone, cpf: ed.cpf, quadra: up(ed.quadra), numero_casa: up(ed.numero_casa), casa_id: `${up(ed.quadra)}-${up(ed.numero_casa)}` });
+      await reload(); setEdit(false); toast("Dados atualizados! ✅");
+    } catch { toast("Erro ao atualizar", "error"); } finally { setSaving(false); }
   };
 
-  const handlePagar = async () => {
-    if (pagForm.valor <= 0) { toast("Valor inválido","error"); return; }
-    setLoading(true);
+  const pagar = async () => {
+    if (+pf.valor <= 0) { toast("Valor inválido", "error"); return; }
+    setSaving(true);
     try {
-      await api.addPagamento({ casa_id:casa.casa_id, mes:pagForm.mes, valor:+pagForm.valor, forma_pagamento:pagForm.forma, data_pagamento: new Date(pagForm.dataPagamento + "T12:00:00").toISOString() });
-      await reload();
-      setShowModal(false);
-      toast("Pagamento registrado!");
-    } catch { toast("Erro ao registrar pagamento","error"); } finally { setLoading(false); }
+      await api.addPagamento({ casa_id: casa.casa_id, mes: pf.mes, valor: +pf.valor, forma_pagamento: pf.forma, data_pagamento: new Date(pf.dt + "T12:00:00").toISOString() });
+      await reload(); setModal(false); toast(`Pagamento de ${R(+pf.valor)} registrado! ✅`);
+    } catch { toast("Erro ao registrar", "error"); } finally { setSaving(false); }
   };
 
-  const handleDeletePag = async (id) => {
+  const delPag = async (id) => {
     if (!confirm("Excluir pagamento?")) return;
-    setLoading(true);
-    try { await api.deletePagamento(id); await reload(); toast("Pagamento excluído."); }
-    catch { toast("Erro ao excluir","error"); } finally { setLoading(false); }
+    try { await api.deletePagamento(id); await reload(); toast("Pagamento excluído.", "warn"); }
+    catch { toast("Erro ao excluir", "error"); }
   };
 
-  const handleDeleteMorador = async () => {
-    if (!confirm(`Excluir ${casa.nome}?`)) return;
-    setLoading(true);
-    try { await api.deleteMorador(casa.id); await reload(); setPage("casas"); }
-    catch { toast("Erro ao excluir","error"); } finally { setLoading(false); }
+  const delMorador = async () => {
+    if (!confirm(`Excluir ${cap(casa.nome)}?`)) return;
+    try { await api.deleteMorador(casa.id); await reload(); setPage("casas"); toast("Condômino removido.", "warn"); }
+    catch { toast("Erro ao excluir", "error"); }
   };
 
-  const Field = ({ label, val, field }) => (
-    <div style={{ marginBottom:14 }}>
-      <div style={{ color:"#64748b", fontSize:12, marginBottom:4 }}>{label}</div>
-      {editMode
-        ? <input value={editData[field]||""} onChange={e => setEditData(p=>({...p,[field]:e.target.value}))}
-            style={{ width:"100%", background:"#0f172a", border:"1px solid #334155", borderRadius:10, padding:"10px 12px", color:"#f1f5f9", fontSize:14, outline:"none", boxSizing:"border-box" }} />
-        : <div style={{ color:"#f1f5f9", fontSize:15, fontWeight:500 }}>{val||"—"}</div>
+  const F = ({ lb, field }) => (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ color: C.muted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: .5, marginBottom: 4 }}>{lb}</div>
+      {edit
+        ? <input value={ed[field] || ""} onChange={e => setEd(p => ({ ...p, [field]: e.target.value }))}
+            style={{ width: "100%", background: C.bg, border: `1.5px solid ${C.border2}`, borderRadius: 10, padding: "9px 12px", color: C.text, fontSize: 13, outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
+        : <div style={{ color: C.text, fontSize: 14, fontWeight: 600 }}>{casa[field] || "—"}</div>
       }
     </div>
   );
 
   return (
-    <div style={{ padding:"20px 16px", paddingBottom:80 }}>
-      <button onClick={() => setPage("casas")} style={{ background:"none", border:"none", color:"#38bdf8", cursor:"pointer", display:"flex", alignItems:"center", gap:6, fontSize:14, padding:0, marginBottom:16 }}>
-        <Icon name="arrow_l" size={16} color="#38bdf8" /> Voltar
+    <div style={{ padding: "20px 16px 88px" }}>
+      <button onClick={() => setPage("casas")} style={{ background: "none", border: "none", color: C.accent, cursor: "pointer", display: "flex", alignItems: "center", gap: 5, fontSize: 13, padding: 0, marginBottom: 16, fontWeight: 600, fontFamily: "inherit" }}>
+        <Ic n="al" sz={14} c={C.accent} /> Voltar
       </button>
 
-      <div style={{ display:"flex", alignItems:"center", gap:16, marginBottom:20 }}>
-        <div style={{ width:56, height:56, borderRadius:16, background:`${s.bg}22`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:28 }}>🏠</div>
-        <div style={{ flex:1 }}>
-          <h1 style={{ color:"#f1f5f9", fontSize:20, fontWeight:800, margin:0 }}>{casa.nome}</h1>
-          <div style={{ color:"#94a3b8", fontSize:13 }}>Casa {casa.casa_id}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
+        <div style={{ width: 54, height: 54, borderRadius: 15, background: s.dim, border: `2px solid ${s.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26 }}>🏠</div>
+        <div style={{ flex: 1 }}>
+          <h1 style={{ color: C.text, fontSize: 19, fontWeight: 900, margin: 0 }}>{cap(casa.nome)}</h1>
+          <div style={{ color: C.sub, fontSize: 12 }}>Casa {casa.casa_id}</div>
         </div>
-        <div style={{ background:`${s.bg}22`, color:s.bg, border:`1px solid ${s.bg}55`, borderRadius:10, padding:"6px 12px", fontSize:12, fontWeight:700 }}>{s.label}</div>
+        <SBadge status={stNow} lg />
       </div>
 
-      <div style={{ background:"#1e293b", borderRadius:16, padding:"20px", marginBottom:16 }}>
-        <div style={{ display:"flex", justifyContent:"space-between", marginBottom:16 }}>
-          <h2 style={{ color:"#f1f5f9", fontSize:15, fontWeight:700, margin:0 }}>Informações</h2>
-          <div style={{ display:"flex", gap:8 }}>
-            {editMode ? (
-              <>
-                <button onClick={handleSaveEdit} disabled={loading} style={{ background:"#10b981", border:"none", color:"#fff", borderRadius:8, padding:"6px 14px", fontSize:13, fontWeight:600, cursor:"pointer" }}>Salvar</button>
-                <button onClick={() => setEditMode(false)} style={{ background:"#334155", border:"none", color:"#94a3b8", borderRadius:8, padding:"6px 14px", fontSize:13, cursor:"pointer" }}>Cancelar</button>
-              </>
-            ) : (
-              <>
-                <button onClick={() => setEditMode(true)} style={{ background:"#334155", border:"none", color:"#38bdf8", borderRadius:8, padding:"6px 12px", cursor:"pointer" }}><Icon name="edit" size={15} color="#38bdf8" /></button>
-                <button onClick={handleDeleteMorador} style={{ background:"#ef444422", border:"none", color:"#f87171", borderRadius:8, padding:"6px 12px", cursor:"pointer" }}><Icon name="trash" size={15} color="#f87171" /></button>
-              </>
-            )}
+      {/* Ações rápidas */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 9, marginBottom: 14 }}>
+        {stNow !== "pago" && (
+          <Btn v="success" full sz="lg" onClick={() => setModal(true)}>✓ Marcar como Pago</Btn>
+        )}
+        {stNow !== "pago" && casa.telefone && (
+          <a href={waLink(casa.telefone, casa.nome, getMesNow())} target="_blank" rel="noreferrer"
+            style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "linear-gradient(135deg,#25d366,#128c7e)", borderRadius: 14, padding: "12px", color: "#fff", fontWeight: 700, fontSize: 14, textDecoration: "none" }}>
+            <Ic n="ph" sz={17} c="#fff" /> Cobrar via WhatsApp
+          </a>
+        )}
+      </div>
+
+      {/* Info */}
+      <Crd sx={{ marginBottom: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+          <span style={{ color: C.text, fontWeight: 700, fontSize: 14 }}>👤 Dados do Morador</span>
+          <div style={{ display: "flex", gap: 7 }}>
+            {edit
+              ? <><Btn v="success" sz="sm" loading={saving} onClick={salvarEdit}>Salvar</Btn><Btn v="ghost" sz="sm" onClick={() => setEdit(false)}>Cancelar</Btn></>
+              : <><Btn v="ghost" sz="sm" onClick={() => setEdit(true)}><Ic n="edt" sz={13} c={C.accent} /></Btn><Btn v="danger" sz="sm" onClick={delMorador}><Ic n="trs" sz={13} c={C.red} /></Btn></>
+            }
           </div>
         </div>
-        <Field label="Nome"     val={casa.nome}        field="nome"        />
-        <Field label="Telefone" val={casa.telefone}    field="telefone"    />
-        <Field label="CPF"      val={casa.cpf}         field="cpf"         />
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
-          <Field label="Quadra"  val={casa.quadra}      field="quadra"      />
-          <Field label="Nº Casa" val={casa.numero_casa} field="numero_casa" />
+        <F lb="Nome"     field="nome"       />
+        <F lb="Telefone" field="telefone"   />
+        <F lb="CPF"      field="cpf"        />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <F lb="Quadra"  field="quadra"     />
+          <F lb="Nº Casa" field="numero_casa"/>
         </div>
-      </div>
+      </Crd>
 
-      {statusAtual !== "pago" && (
-        <button onClick={() => setShowModal(true)} style={{ width:"100%", background:"linear-gradient(135deg,#10b981,#059669)", border:"none", borderRadius:14, padding:"16px", color:"#fff", fontSize:16, fontWeight:700, cursor:"pointer", marginBottom:16 }}>
-          ✓ Marcar como Pago
-        </button>
-      )}
-
-      <div style={{ background:"#1e293b", borderRadius:16, padding:"20px" }}>
-        <h2 style={{ color:"#f1f5f9", fontSize:15, fontWeight:700, margin:"0 0 16px" }}>Histórico de Pagamentos</h2>
-        {pagsCasa.length === 0
-          ? <div style={{ color:"#64748b", textAlign:"center", padding:"20px 0", fontSize:14 }}>Nenhum pagamento registrado</div>
-          : pagsCasa.map(p => (
-            <div key={p.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"12px 0", borderBottom:"1px solid #0f172a" }}>
+      {/* Histórico */}
+      <Crd>
+        <div style={{ color: C.text, fontWeight: 700, fontSize: 14, marginBottom: 12 }}>📋 Histórico de Pagamentos</div>
+        {pags.length === 0
+          ? <div style={{ color: C.muted, textAlign: "center", padding: "20px 0", fontSize: 13 }}>Nenhum pagamento registrado</div>
+          : pags.map((p, i) => (
+            <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < pags.length - 1 ? `1px solid ${C.border}` : "none" }}>
               <div>
-                <div style={{ color:"#f1f5f9", fontWeight:600, fontSize:14 }}>{capFirst(formatMes(p.mes))}</div>
-                <div style={{ color:"#64748b", fontSize:12, marginTop:2 }}>{fmtData(p.data_pagamento)} · {capFirst(p.forma_pagamento)}</div>
+                <div style={{ color: C.text, fontWeight: 600, fontSize: 13 }}>{cap(fmtMes(p.mes))}</div>
+                <div style={{ color: C.muted, fontSize: 11, marginTop: 2 }}>{fmtData(p.data_pagamento)} · {cap(p.forma_pagamento)}</div>
               </div>
-              <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                <span style={{ color:"#34d399", fontWeight:700, fontSize:15 }}>{fmtMoeda(p.valor)}</span>
-                <button onClick={() => handleDeletePag(p.id)} style={{ background:"none", border:"none", cursor:"pointer", padding:4 }}><Icon name="trash" size={14} color="#ef4444" /></button>
+              <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                <span style={{ color: C.green, fontWeight: 800, fontSize: 14 }}>{R(p.valor)}</span>
+                <button onClick={() => delPag(p.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 3, display: "flex" }}><Ic n="trs" sz={13} c={C.red} /></button>
               </div>
             </div>
           ))
         }
-      </div>
+      </Crd>
 
-      {showModal && (
-        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.7)", display:"flex", alignItems:"flex-end", zIndex:200 }} onClick={() => setShowModal(false)}>
-          <div style={{ background:"#1e293b", borderRadius:"20px 20px 0 0", padding:24, width:"100%", boxSizing:"border-box" }} onClick={e => e.stopPropagation()}>
-            <h2 style={{ color:"#f1f5f9", fontSize:18, fontWeight:800, marginBottom:20 }}>Registrar Pagamento</h2>
-            <div style={{ marginBottom:14 }}>
-              <label style={{ color:"#94a3b8", fontSize:12, display:"block", marginBottom:6 }}>Mês</label>
-              <input type="month" value={pagForm.mes.split("-").reverse().join("-")}
-                onChange={e => { const [y,m]=e.target.value.split("-"); setPagForm(p=>({...p,mes:`${m}-${y}`})); }}
-                style={{ width:"100%", background:"#0f172a", border:"1px solid #334155", borderRadius:10, padding:"10px 12px", color:"#f1f5f9", fontSize:14, outline:"none", boxSizing:"border-box" }} />
+      {/* Modal Pagar */}
+      {modal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.8)", display: "flex", alignItems: "flex-end", zIndex: 300 }} onClick={() => setModal(false)}>
+          <div style={{ background: C.card, border: `1px solid ${C.border2}`, borderRadius: "22px 22px 0 0", padding: "24px 20px 32px", width: "100%", maxWidth: 480, margin: "0 auto", boxSizing: "border-box" }} onClick={e => e.stopPropagation()}>
+            <div style={{ width: 36, height: 4, background: C.border2, borderRadius: 99, margin: "0 auto 20px" }} />
+            <h2 style={{ color: C.text, fontSize: 17, fontWeight: 800, marginBottom: 18 }}>💳 Registrar Pagamento</h2>
+
+            {/* Mês */}
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ color: C.sub, fontSize: 11, fontWeight: 700, display: "block", marginBottom: 5, textTransform: "uppercase", letterSpacing: .5 }}>Mês de referência</label>
+              <input type="month" value={pf.mes.split("-").reverse().join("-")}
+                onChange={e => { const [y, m] = e.target.value.split("-"); setPf(p => ({ ...p, mes: `${m}-${y}` })); }}
+                style={{ width: "100%", background: C.bg, border: `1.5px solid ${C.border2}`, borderRadius: 11, padding: "10px 12px", color: C.text, fontSize: 14, outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
             </div>
-            <div style={{ marginBottom:14 }}>
-              <label style={{ color:"#94a3b8", fontSize:12, display:"block", marginBottom:6 }}>Valor (R$)</label>
-              <input type="number" value={pagForm.valor} min="0" step="0.01" onChange={e => setPagForm(p=>({...p,valor:e.target.value}))}
-                style={{ width:"100%", background:"#0f172a", border:"1px solid #334155", borderRadius:10, padding:"10px 12px", color:"#f1f5f9", fontSize:14, outline:"none", boxSizing:"border-box" }} />
+
+            {/* Valor */}
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ color: C.sub, fontSize: 11, fontWeight: 700, display: "block", marginBottom: 5, textTransform: "uppercase", letterSpacing: .5 }}>Valor (R$)</label>
+              <input type="number" value={pf.valor} min="0" step="0.01" onChange={e => setPf(p => ({ ...p, valor: e.target.value }))}
+                style={{ width: "100%", background: C.bg, border: `1.5px solid ${C.border2}`, borderRadius: 11, padding: "10px 12px", color: C.text, fontSize: 14, outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
             </div>
-            <div style={{ marginBottom:14 }}>
-              <label style={{ color:"#94a3b8", fontSize:12, display:"block", marginBottom:6 }}>Data do Pagamento</label>
-              <input type="date" value={pagForm.dataPagamento} onChange={e => setPagForm(p=>({...p,dataPagamento:e.target.value}))}
-                style={{ width:"100%", background:"#0f172a", border:"1px solid #334155", borderRadius:10, padding:"10px 12px", color:"#f1f5f9", fontSize:14, outline:"none", boxSizing:"border-box" }} />
-              <div style={{ color:"#64748b", fontSize:11, marginTop:4 }}>Pré-preenchida com hoje. Altere se necessário.</div>
+
+            {/* Data */}
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ color: C.sub, fontSize: 11, fontWeight: 700, display: "block", marginBottom: 5, textTransform: "uppercase", letterSpacing: .5 }}>Data do pagamento</label>
+              <input type="date" value={pf.dt} onChange={e => setPf(p => ({ ...p, dt: e.target.value }))}
+                style={{ width: "100%", background: C.bg, border: `1.5px solid ${C.border2}`, borderRadius: 11, padding: "10px 12px", color: C.text, fontSize: 14, outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
+              <div style={{ color: C.muted, fontSize: 11, marginTop: 4 }}>Pré-preenchida com hoje. Altere se necessário.</div>
             </div>
-            <div style={{ marginBottom:20 }}>
-              <label style={{ color:"#94a3b8", fontSize:12, display:"block", marginBottom:8 }}>Forma de Pagamento</label>
-              <div style={{ display:"flex", gap:8 }}>
-                {FORMAS_PAG.map(f => (
-                  <button key={f} onClick={() => setPagForm(p=>({...p,forma:f}))}
-                    style={{ flex:1, padding:"10px 4px", borderRadius:10, border:`1.5px solid ${pagForm.forma===f?"#38bdf8":"#334155"}`, background: pagForm.forma===f?"#38bdf815":"#0f172a", color: pagForm.forma===f?"#38bdf8":"#64748b", fontSize:12, fontWeight:600, cursor:"pointer", textTransform:"capitalize" }}>
-                    {f}
+
+            {/* Forma */}
+            <div style={{ marginBottom: 18 }}>
+              <label style={{ color: C.sub, fontSize: 11, fontWeight: 700, display: "block", marginBottom: 8, textTransform: "uppercase", letterSpacing: .5 }}>Forma de pagamento</label>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
+                {FORMAS.map(f => (
+                  <button key={f} onClick={() => setPf(p => ({ ...p, forma: f }))}
+                    style={{ padding: "10px", borderRadius: 10, border: `1.5px solid ${pf.forma === f ? C.accent : C.border2}`, background: pf.forma === f ? `${C.accent}18` : C.bg, color: pf.forma === f ? C.accent : C.muted, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                    {f === "pix" ? "📱 Pix" : f === "dinheiro" ? "💵 Dinheiro" : f === "debito" ? "💳 Débito" : "💳 Crédito"}
                   </button>
                 ))}
               </div>
             </div>
-            <button onClick={handlePagar} disabled={loading} style={{ width:"100%", background:"linear-gradient(135deg,#10b981,#059669)", border:"none", borderRadius:12, padding:"15px", color:"#fff", fontSize:16, fontWeight:700, cursor:"pointer", opacity:loading?.7:1 }}>
-              {loading ? "Salvando..." : "Confirmar Pagamento"}
-            </button>
+
+            <Btn v="success" full sz="lg" loading={saving} onClick={pagar}>
+              Confirmar {R(+pf.valor || 0)}
+            </Btn>
           </div>
         </div>
       )}
@@ -491,70 +660,74 @@ const CasaDetalhe = ({ casa, pagamentos, setPage, toast, reload }) => {
 // ============================================================
 // CADASTRO
 // ============================================================
-const CadastroField = ({ label, value, onChange, placeholder, required, type = "text" }) => (
-  <div style={{ marginBottom:16 }}>
-    <label style={{ color:"#94a3b8", fontSize:12, display:"block", marginBottom:6 }}>
-      {label}{required && <span style={{ color:"#f87171" }}> *</span>}
-    </label>
-    <input
-      type={type}
-      value={value}
-      onChange={onChange}
-      placeholder={placeholder}
-      style={{ width:"100%", background:"#1e293b", border:"1px solid #334155", borderRadius:12, padding:"12px 14px", color:"#f1f5f9", fontSize:14, outline:"none", boxSizing:"border-box" }}
-    />
-  </div>
-);
-
 const Cadastro = ({ toast, reload, setPage }) => {
-  const [nome, setNome] = useState("");
-  const [telefone, setTelefone] = useState("");
-  const [cpf, setCpf] = useState("");
+  const [nome,   setNome]   = useState("");
+  const [tel,    setTel]    = useState("");
+  const [cpf,    setCpf]    = useState("");
   const [quadra, setQuadra] = useState("");
-  const [numeroCasa, setNumeroCasa] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [num,    setNum]    = useState("");
+  const [erros,  setErros]  = useState({});
+  const [saving, setSaving] = useState(false);
 
-  const handleSubmit = async () => {
-    if (!nome || !telefone || !quadra || !numeroCasa) { toast("Preencha todos os campos obrigatórios","error"); return; }
-    setLoading(true);
+  const validar = () => {
+    const e = {};
+    if (!nome.trim())  e.nome = "Nome é obrigatório";
+    if (!tel.trim())   e.tel  = "Telefone é obrigatório";
+    else if (!validarTel(tel)) e.tel = "Formato inválido. Ex: (91) 99999-9999";
+    if (cpf && !validarCPF(cpf)) e.cpf = "CPF inválido";
+    if (!quadra.trim()) e.quadra = "Quadra obrigatória";
+    if (!num.trim())    e.num   = "Número obrigatório";
+    setErros(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const submit = async () => {
+    if (!validar()) { toast("Corrija os campos destacados", "error"); return; }
+    setSaving(true);
     try {
-      await api.addMorador({ nome, telefone, cpf, quadra: quadra.toUpperCase(), numero_casa: numeroCasa, casa_id:`${quadra.toUpperCase()}-${numeroCasa}` });
+      await api.addMorador({ nome: up(nome), telefone: tel.trim(), cpf: cpf.trim() || null, quadra: up(quadra), numero_casa: up(num), casa_id: `${up(quadra)}-${up(num)}` });
       await reload();
-      toast("Condômino cadastrado com sucesso!");
-      setNome(""); setTelefone(""); setCpf(""); setQuadra(""); setNumeroCasa("");
+      toast("Condômino cadastrado! 🎉");
+      setNome(""); setTel(""); setCpf(""); setQuadra(""); setNum(""); setErros({});
       setPage("casas");
-    } catch { toast("Erro ao cadastrar","error"); } finally { setLoading(false); }
+    } catch { toast("Erro ao cadastrar", "error"); } finally { setSaving(false); }
   };
 
   return (
-    <div style={{ padding:"20px 16px", paddingBottom:80 }}>
-      <h1 style={{ color:"#f1f5f9", fontSize:22, fontWeight:800, marginBottom:4 }}>Novo Condômino</h1>
-      <p style={{ color:"#64748b", fontSize:13, marginBottom:24 }}>Preencha os dados do morador</p>
-      <div style={{ background:"#1e293b", borderRadius:16, padding:"20px" }}>
-        <CadastroField label="Nome completo" value={nome}     onChange={e => setNome(e.target.value)}     placeholder="João da Silva"   required />
-        <CadastroField label="Telefone"      value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(91) 99999-9999" required />
-        <CadastroField label="CPF"           value={cpf}      onChange={e => setCpf(e.target.value)}      placeholder="000.000.000-00"  />
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+    <div style={{ padding: "20px 16px 88px" }}>
+      <h1 style={{ color: C.text, fontSize: 22, fontWeight: 900, marginBottom: 4 }}>➕ Novo Condômino</h1>
+      <p style={{ color: C.muted, fontSize: 12, marginBottom: 18 }}>Preencha os dados do morador</p>
+
+      <Crd>
+        <Inp label="Nome Completo" value={nome} onChange={e => { setNome(e.target.value); setErros(p => ({ ...p, nome: undefined })); }} placeholder="JOÃO DA SILVA" required err={erros.nome} />
+        <Inp label="Telefone" value={tel} onChange={e => { setTel(maskTel(e.target.value)); setErros(p => ({ ...p, tel: undefined })); }} placeholder="(91) 99999-9999" required err={erros.tel} hint="Usado para cobranças via WhatsApp" />
+        <Inp label="CPF (opcional)" value={cpf} onChange={e => { setCpf(maskCPF(e.target.value)); setErros(p => ({ ...p, cpf: undefined })); }} placeholder="000.000.000-00" err={erros.cpf} />
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
           <div>
-            <label style={{ color:"#94a3b8", fontSize:12, display:"block", marginBottom:6 }}>Quadra <span style={{ color:"#f87171" }}>*</span></label>
-            <input value={quadra} onChange={e => setQuadra(e.target.value.toUpperCase())} placeholder="A"
-              style={{ width:"100%", background:"#0f172a", border:"1px solid #334155", borderRadius:10, padding:"12px 14px", color:"#f1f5f9", fontSize:14, outline:"none", boxSizing:"border-box" }} />
+            <label style={{ color: C.sub, fontSize: 11, fontWeight: 700, display: "block", marginBottom: 5, textTransform: "uppercase", letterSpacing: .5 }}>Quadra <span style={{ color: C.red }}>*</span></label>
+            <input value={quadra} onChange={e => { setQuadra(e.target.value.toUpperCase()); setErros(p => ({ ...p, quadra: undefined })); }} placeholder="A"
+              style={{ width: "100%", background: C.bg, border: `1.5px solid ${erros.quadra ? C.red : C.border2}`, borderRadius: 11, padding: "11px 13px", color: C.text, fontSize: 14, outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
+            {erros.quadra && <div style={{ color: C.red, fontSize: 11, marginTop: 3 }}>⚠ {erros.quadra}</div>}
           </div>
           <div>
-            <label style={{ color:"#94a3b8", fontSize:12, display:"block", marginBottom:6 }}>Nº Casa <span style={{ color:"#f87171" }}>*</span></label>
-            <input value={numeroCasa} onChange={e => setNumeroCasa(e.target.value)} placeholder="01"
-              style={{ width:"100%", background:"#0f172a", border:"1px solid #334155", borderRadius:10, padding:"12px 14px", color:"#f1f5f9", fontSize:14, outline:"none", boxSizing:"border-box" }} />
+            <label style={{ color: C.sub, fontSize: 11, fontWeight: 700, display: "block", marginBottom: 5, textTransform: "uppercase", letterSpacing: .5 }}>Nº Casa <span style={{ color: C.red }}>*</span></label>
+            <input value={num} onChange={e => { setNum(e.target.value); setErros(p => ({ ...p, num: undefined })); }} placeholder="01"
+              style={{ width: "100%", background: C.bg, border: `1.5px solid ${erros.num ? C.red : C.border2}`, borderRadius: 11, padding: "11px 13px", color: C.text, fontSize: 14, outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
+            {erros.num && <div style={{ color: C.red, fontSize: 11, marginTop: 3 }}>⚠ {erros.num}</div>}
           </div>
         </div>
-        {quadra && numeroCasa && (
-          <div style={{ background:"#38bdf815", border:"1px solid #38bdf833", borderRadius:10, padding:"10px 14px", marginTop:16, color:"#38bdf8", fontSize:13 }}>
-            ID da Casa: <strong>{quadra.toUpperCase()}-{numeroCasa}</strong>
+
+        {quadra && num && (
+          <div style={{ background: `${C.accent}10`, border: `1px solid ${C.accent}28`, borderRadius: 10, padding: "9px 13px", marginTop: 14, color: C.accent, fontSize: 13, fontWeight: 600 }}>
+            🏠 ID: <strong>{up(quadra)}-{up(num)}</strong>
           </div>
         )}
-      </div>
-      <button onClick={handleSubmit} disabled={loading} style={{ width:"100%", background:"linear-gradient(135deg,#0ea5e9,#2563eb)", border:"none", borderRadius:14, padding:"16px", color:"#fff", fontSize:16, fontWeight:700, cursor:"pointer", marginTop:20, opacity:loading?.7:1 }}>
-        {loading ? "Salvando..." : "Cadastrar Condômino"}
-      </button>
+      </Crd>
+
+      <Btn v="primary" full sz="lg" loading={saving} onClick={submit} sx={{ marginTop: 14 }}>
+        Cadastrar Condômino
+      </Btn>
     </div>
   );
 };
@@ -563,144 +736,158 @@ const Cadastro = ({ toast, reload, setPage }) => {
 // FINANCEIRO
 // ============================================================
 const Financeiro = ({ financeiro, toast, reload }) => {
-  const [form, setForm] = useState({ tipo:"entrada", descricao:"", valor:"", data:new Date().toISOString().split("T")[0], categoria:"" });
-  const [filtros, setFiltros] = useState({ tipo:"todos", mes:"", dataInicio:"", dataFim:"", categoria:"" });
+  const [form,     setForm]     = useState({ tipo: "entrada", descricao: "", valor: "", data: new Date().toISOString().split("T")[0], categoria: "" });
+  const [filtros,  setFiltros]  = useState({ tipo: "todos", mes: "", dataInicio: "", dataFim: "", categoria: "" });
   const [showForm, setShowForm] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [saving,   setSaving]   = useState(false);
+  const [erros,    setErros]    = useState({});
 
-  const handleAdd = async () => {
-    if (!form.descricao) { toast("Informe uma descrição","error"); return; }
-    if (!form.valor || +form.valor<=0) { toast("Valor inválido","error"); return; }
-    if (!form.data) { toast("Informe a data","error"); return; }
-    setLoading(true);
-    try {
-      await api.addFinanceiro({ ...form, valor:+form.valor });
-      await reload();
-      toast(`${form.tipo==="entrada"?"Entrada":"Saída"} cadastrada com sucesso!`);
-      setForm({ tipo:"entrada", descricao:"", valor:"", data:new Date().toISOString().split("T")[0], categoria:"" });
-      setShowForm(false);
-    } catch { toast("Erro ao salvar","error"); } finally { setLoading(false); }
+  const validar = () => {
+    const e = {};
+    if (!form.descricao.trim()) e.desc = "Descrição obrigatória";
+    if (!form.valor || +form.valor <= 0) e.valor = "Valor deve ser > 0";
+    if (!form.data)  e.data = "Data obrigatória";
+    setErros(e); return Object.keys(e).length === 0;
   };
 
-  const handleDelete = async (id) => {
+  const add = async () => {
+    if (!validar()) { toast("Corrija os campos", "error"); return; }
+    setSaving(true);
+    try {
+      await api.addFinanceiro({ ...form, descricao: up(form.descricao), valor: +form.valor });
+      await reload();
+      toast(`${form.tipo === "entrada" ? "Entrada" : "Saída"} registrada! ✅`);
+      setForm({ tipo: "entrada", descricao: "", valor: "", data: new Date().toISOString().split("T")[0], categoria: "" });
+      setShowForm(false); setErros({});
+    } catch { toast("Erro ao salvar", "error"); } finally { setSaving(false); }
+  };
+
+  const del = async (id) => {
     if (!confirm("Excluir movimentação?")) return;
-    try { await api.deleteFinanceiro(id); await reload(); toast("Movimentação excluída."); }
-    catch { toast("Erro ao excluir","error"); }
+    try { await api.deleteFinanceiro(id); await reload(); toast("Excluído.", "warn"); }
+    catch { toast("Erro ao excluir", "error"); }
   };
 
   const filtrado = financeiro.filter(f => {
     if (filtros.tipo !== "todos" && f.tipo !== filtros.tipo) return false;
     if (filtros.categoria && f.categoria !== filtros.categoria) return false;
-    const d = new Date(f.data+"T12:00:00");
-    if (filtros.mes) { const [y,m]=filtros.mes.split("-"); if(d.getFullYear()!==+y||d.getMonth()+1!==+m) return false; }
-    if (filtros.dataInicio && d < new Date(filtros.dataInicio+"T00:00:00")) return false;
-    if (filtros.dataFim   && d > new Date(filtros.dataFim+"T23:59:59"))   return false;
+    const d = new Date(f.data + "T12:00:00");
+    if (filtros.mes) { const [y, m] = filtros.mes.split("-"); if (d.getFullYear() !== +y || d.getMonth() + 1 !== +m) return false; }
+    if (filtros.dataInicio && d < new Date(filtros.dataInicio + "T00:00:00")) return false;
+    if (filtros.dataFim    && d > new Date(filtros.dataFim + "T23:59:59"))    return false;
     return true;
-  });
+  }).sort((a, b) => new Date(b.data) - new Date(a.data));
 
-  const totais = filtrado.reduce((acc,f)=>{ acc[f.tipo]+=f.valor; return acc; },{entrada:0,saida:0});
+  const tot = filtrado.reduce((a, f) => { a[f.tipo] += f.valor; return a; }, { entrada: 0, saida: 0 });
+
+  const limparFiltros = () => setFiltros({ tipo: "todos", mes: "", dataInicio: "", dataFim: "", categoria: "" });
+  const filtroAtivo = filtros.mes || filtros.dataInicio || filtros.dataFim || filtros.categoria || filtros.tipo !== "todos";
 
   return (
-    <div style={{ padding:"20px 16px", paddingBottom:80 }}>
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
-        <h1 style={{ color:"#f1f5f9", fontSize:22, fontWeight:800, margin:0 }}>Financeiro</h1>
-        <button onClick={() => setShowForm(!showForm)} style={{ background:"#0ea5e9", border:"none", borderRadius:10, padding:"8px 14px", color:"#fff", fontSize:13, fontWeight:600, cursor:"pointer", display:"flex", alignItems:"center", gap:6 }}>
-          <Icon name="plus" size={16} color="#fff" /> Novo
-        </button>
+    <div style={{ padding: "20px 16px 88px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <h1 style={{ color: C.text, fontSize: 22, fontWeight: 900, margin: 0 }}>💰 Financeiro</h1>
+        <Btn v="primary" sz="sm" onClick={() => setShowForm(!showForm)}>
+          <Ic n="plus" sz={14} c="#fff" /> {showForm ? "Fechar" : "Novo"}
+        </Btn>
       </div>
 
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10, marginBottom:16 }}>
-        {[{label:"Entradas",val:totais.entrada,color:"#34d399"},{label:"Saídas",val:totais.saida,color:"#f87171"},{label:"Saldo",val:totais.entrada-totais.saida,color:totais.entrada-totais.saida>=0?"#38bdf8":"#f87171"}].map(c=>(
-          <div key={c.label} style={{ background:"#1e293b", borderRadius:12, padding:"12px 10px", textAlign:"center" }}>
-            <div style={{ color:"#64748b", fontSize:10, fontWeight:600, textTransform:"uppercase" }}>{c.label}</div>
-            <div style={{ color:c.color, fontSize:13, fontWeight:800, marginTop:4 }}>{fmtMoeda(c.val)}</div>
-          </div>
+      {/* Resumo */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 9, marginBottom: 14 }}>
+        {[
+          { lb: "Entradas", val: tot.entrada, c: C.green  },
+          { lb: "Saídas",   val: tot.saida,   c: C.red    },
+          { lb: "Saldo",    val: tot.entrada - tot.saida, c: tot.entrada - tot.saida >= 0 ? C.accent : C.red },
+        ].map(x => (
+          <Crd key={x.lb} sx={{ padding: "11px 10px", textAlign: "center", border: `1px solid ${x.c}20` }}>
+            <div style={{ color: C.muted, fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: .5 }}>{x.lb}</div>
+            <div style={{ color: x.c, fontSize: 12, fontWeight: 800, marginTop: 5 }}>{R(x.val)}</div>
+          </Crd>
         ))}
       </div>
 
+      {/* Formulário */}
       {showForm && (
-        <div style={{ background:"#1e293b", borderRadius:16, padding:"20px", marginBottom:16 }}>
-          <h2 style={{ color:"#f1f5f9", fontSize:15, fontWeight:700, marginBottom:16 }}>Nova Movimentação</h2>
-          <div style={{ display:"flex", gap:8, marginBottom:14 }}>
-            {["entrada","saida"].map(t=>(
-              <button key={t} onClick={()=>setForm(p=>({...p,tipo:t}))}
-                style={{ flex:1, padding:"10px", borderRadius:10, border:"none", background: form.tipo===t?(t==="entrada"?"#10b981":"#ef4444"):"#0f172a", color: form.tipo===t?"#fff":"#64748b", fontWeight:600, fontSize:14, cursor:"pointer" }}>
-                {t==="entrada"?"↑ Entrada":"↓ Saída"}
+        <Crd sx={{ marginBottom: 14 }}>
+          <div style={{ color: C.text, fontWeight: 700, fontSize: 14, marginBottom: 14 }}>Nova Movimentação</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
+            {["entrada", "saida"].map(t => (
+              <button key={t} onClick={() => setForm(p => ({ ...p, tipo: t }))}
+                style={{ padding: "10px", borderRadius: 11, border: `1.5px solid ${form.tipo === t ? (t === "entrada" ? C.green : C.red) : C.border2}`, background: form.tipo === t ? (t === "entrada" ? `${C.green}18` : `${C.red}18`) : C.bg, color: form.tipo === t ? (t === "entrada" ? C.green : C.red) : C.muted, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+                {t === "entrada" ? "📈 Entrada" : "📉 Saída"}
               </button>
             ))}
           </div>
-          <div style={{ marginBottom:12 }}>
-            <label style={{ color:"#94a3b8", fontSize:12, display:"block", marginBottom:6 }}>Descrição *</label>
-            <input value={form.descricao} onChange={e=>setForm(p=>({...p,descricao:e.target.value}))} placeholder="Ex: Manutenção portão"
-              style={{ width:"100%", background:"#0f172a", border:"1px solid #334155", borderRadius:10, padding:"10px 12px", color:"#f1f5f9", fontSize:14, outline:"none", boxSizing:"border-box" }} />
+          <Inp label="Descrição" value={form.descricao} onChange={e => { setForm(p => ({ ...p, descricao: e.target.value })); setErros(p => ({ ...p, desc: undefined })); }} placeholder="EX: MANUTENÇÃO PORTÃO" required err={erros.desc} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 9 }}>
+            <Inp label="Valor (R$)" value={form.valor} onChange={e => { setForm(p => ({ ...p, valor: e.target.value })); setErros(p => ({ ...p, valor: undefined })); }} type="number" required err={erros.valor} />
+            <Inp label="Data" value={form.data} onChange={e => { setForm(p => ({ ...p, data: e.target.value })); setErros(p => ({ ...p, data: undefined })); }} type="date" required err={erros.data} />
           </div>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:12 }}>
-            <div>
-              <label style={{ color:"#94a3b8", fontSize:12, display:"block", marginBottom:6 }}>Valor *</label>
-              <input type="number" value={form.valor} min="0" step="0.01" onChange={e=>setForm(p=>({...p,valor:e.target.value}))}
-                style={{ width:"100%", background:"#0f172a", border:"1px solid #334155", borderRadius:10, padding:"10px 12px", color:"#f1f5f9", fontSize:14, outline:"none", boxSizing:"border-box" }} />
-            </div>
-            <div>
-              <label style={{ color:"#94a3b8", fontSize:12, display:"block", marginBottom:6 }}>Data *</label>
-              <input type="date" value={form.data} onChange={e=>setForm(p=>({...p,data:e.target.value}))}
-                style={{ width:"100%", background:"#0f172a", border:"1px solid #334155", borderRadius:10, padding:"10px 12px", color:"#f1f5f9", fontSize:14, outline:"none", boxSizing:"border-box" }} />
-            </div>
-          </div>
-          <div style={{ marginBottom:16 }}>
-            <label style={{ color:"#94a3b8", fontSize:12, display:"block", marginBottom:6 }}>Categoria</label>
-            <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-              {["",...CATEGORIAS].map(c=>(
-                <button key={c} onClick={()=>setForm(p=>({...p,categoria:c}))}
-                  style={{ padding:"6px 12px", borderRadius:8, border:`1px solid ${form.categoria===c?"#38bdf8":"#334155"}`, background: form.categoria===c?"#38bdf815":"transparent", color: form.categoria===c?"#38bdf8":"#64748b", fontSize:12, cursor:"pointer" }}>
-                  {c||"Nenhuma"}
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ color: C.sub, fontSize: 11, fontWeight: 700, display: "block", marginBottom: 7, textTransform: "uppercase", letterSpacing: .5 }}>Categoria</label>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {["", ...CATEGORIAS].map(c => (
+                <button key={c} onClick={() => setForm(p => ({ ...p, categoria: c }))}
+                  style={{ padding: "5px 11px", borderRadius: 7, border: `1px solid ${form.categoria === c ? C.accent : C.border2}`, background: form.categoria === c ? `${C.accent}18` : "transparent", color: form.categoria === c ? C.accent : C.muted, fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                  {c || "Nenhuma"}
                 </button>
               ))}
             </div>
           </div>
-          <button onClick={handleAdd} disabled={loading} style={{ width:"100%", background: form.tipo==="entrada"?"linear-gradient(135deg,#10b981,#059669)":"linear-gradient(135deg,#ef4444,#dc2626)", border:"none", borderRadius:12, padding:"14px", color:"#fff", fontSize:15, fontWeight:700, cursor:"pointer", opacity:loading?.7:1 }}>
-            {loading?"Salvando...": `Adicionar ${form.tipo==="entrada"?"Entrada":"Saída"}`}
-          </button>
-        </div>
+          <Btn v={form.tipo === "entrada" ? "success" : "danger"} full sz="md" loading={saving} onClick={add}>
+            Registrar {form.tipo === "entrada" ? "Entrada" : "Saída"}{form.valor ? ` · ${R(+form.valor)}` : ""}
+          </Btn>
+        </Crd>
       )}
 
-      <div style={{ background:"#1e293b", borderRadius:16, padding:"16px", marginBottom:16 }}>
-        <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:10 }}>
-          {[["todos","Todos"],["entrada","Entradas"],["saida","Saídas"]].map(([v,l])=>(
-            <button key={v} onClick={()=>setFiltros(p=>({...p,tipo:v}))}
-              style={{ padding:"6px 14px", borderRadius:8, border:`1px solid ${filtros.tipo===v?"#38bdf8":"#334155"}`, background: filtros.tipo===v?"#38bdf815":"transparent", color: filtros.tipo===v?"#38bdf8":"#64748b", fontSize:12, cursor:"pointer" }}>
+      {/* Filtros */}
+      <Crd sx={{ marginBottom: 14 }}>
+        <div style={{ display: "flex", gap: 6, marginBottom: 9 }}>
+          {[["todos", "Todos"], ["entrada", "📈 Entradas"], ["saida", "📉 Saídas"]].map(([v, l]) => (
+            <button key={v} onClick={() => setFiltros(p => ({ ...p, tipo: v }))}
+              style={{ flex: 1, padding: "7px 4px", borderRadius: 8, border: `1px solid ${filtros.tipo === v ? C.accent : C.border2}`, background: filtros.tipo === v ? `${C.accent}18` : "transparent", color: filtros.tipo === v ? C.accent : C.muted, fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
               {l}
             </button>
           ))}
         </div>
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
-          <input type="month" value={filtros.mes} onChange={e=>setFiltros(p=>({...p,mes:e.target.value}))}
-            style={{ background:"#0f172a", border:"1px solid #334155", borderRadius:8, padding:"8px 10px", color:"#f1f5f9", fontSize:12, outline:"none" }} />
-          <select value={filtros.categoria} onChange={e=>setFiltros(p=>({...p,categoria:e.target.value}))}
-            style={{ background:"#0f172a", border:"1px solid #334155", borderRadius:8, padding:"8px 10px", color:"#f1f5f9", fontSize:12, outline:"none" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
+          <input type="month" value={filtros.mes} onChange={e => setFiltros(p => ({ ...p, mes: e.target.value }))}
+            style={{ background: C.bg, border: `1px solid ${C.border2}`, borderRadius: 8, padding: "8px 9px", color: C.text, fontSize: 11, outline: "none", fontFamily: "inherit" }} />
+          <select value={filtros.categoria} onChange={e => setFiltros(p => ({ ...p, categoria: e.target.value }))}
+            style={{ background: C.bg, border: `1px solid ${C.border2}`, borderRadius: 8, padding: "8px 9px", color: C.text, fontSize: 11, outline: "none", fontFamily: "inherit" }}>
             <option value="">Todas categ.</option>
-            {CATEGORIAS.map(c=><option key={c} value={c}>{capFirst(c)}</option>)}
+            {CATEGORIAS.map(c => <option key={c} value={c}>{cap(c)}</option>)}
           </select>
+          <input type="date" value={filtros.dataInicio} onChange={e => setFiltros(p => ({ ...p, dataInicio: e.target.value }))}
+            style={{ background: C.bg, border: `1px solid ${C.border2}`, borderRadius: 8, padding: "8px 9px", color: C.text, fontSize: 11, outline: "none", fontFamily: "inherit" }} />
+          <input type="date" value={filtros.dataFim} onChange={e => setFiltros(p => ({ ...p, dataFim: e.target.value }))}
+            style={{ background: C.bg, border: `1px solid ${C.border2}`, borderRadius: 8, padding: "8px 9px", color: C.text, fontSize: 11, outline: "none", fontFamily: "inherit" }} />
         </div>
-      </div>
+        {filtroAtivo && (
+          <button onClick={limparFiltros} style={{ background: "none", border: "none", color: C.muted, fontSize: 11, cursor: "pointer", marginTop: 7, padding: 0, fontFamily: "inherit" }}>
+            ✕ Limpar filtros
+          </button>
+        )}
+      </Crd>
 
-      {filtrado.length===0
-        ? <div style={{ textAlign:"center", color:"#64748b", marginTop:40, fontSize:14 }}>Nenhuma movimentação encontrada</div>
-        : <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-            {filtrado.map(f=>(
-              <div key={f.id} style={{ background:"#1e293b", borderRadius:14, padding:"14px 16px", display:"flex", alignItems:"center", gap:12, border:`1px solid ${f.tipo==="entrada"?"#10b98122":"#ef444422"}` }}>
-                <div style={{ width:38, height:38, borderRadius:10, background: f.tipo==="entrada"?"#10b98122":"#ef444422", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                  <Icon name={f.tipo==="entrada"?"arrow_up":"arrow_down"} size={18} color={f.tipo==="entrada"?"#34d399":"#f87171"} />
+      {filtrado.length === 0
+        ? <div style={{ textAlign: "center", color: C.muted, marginTop: 40, fontSize: 13 }}>Nenhuma movimentação encontrada</div>
+        : <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {filtrado.map(f => (
+              <div key={f.id} style={{ background: C.card, border: `1px solid ${f.tipo === "entrada" ? `${C.green}20` : `${C.red}20`}`, borderRadius: 14, padding: "13px 15px", display: "flex", alignItems: "center", gap: 11 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: f.tipo === "entrada" ? `${C.green}15` : `${C.red}15`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, flexShrink: 0 }}>
+                  {f.tipo === "entrada" ? "📈" : "📉"}
                 </div>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ color:"#f1f5f9", fontWeight:600, fontSize:14, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{f.descricao}</div>
-                  <div style={{ display:"flex", gap:8, marginTop:3, alignItems:"center" }}>
-                    <span style={{ color:"#64748b", fontSize:11 }}>{fmtData(f.data)}</span>
-                    {f.categoria&&<span style={{ background:"#334155", color:"#94a3b8", borderRadius:4, padding:"1px 6px", fontSize:10, fontWeight:600 }}>{capFirst(f.categoria)}</span>}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: C.text, fontWeight: 600, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{f.descricao}</div>
+                  <div style={{ display: "flex", gap: 6, marginTop: 3, alignItems: "center" }}>
+                    <span style={{ color: C.muted, fontSize: 11 }}>{fmtData(f.data)}</span>
+                    {f.categoria && <span style={{ background: C.border2, color: C.sub, borderRadius: 4, padding: "1px 6px", fontSize: 9, fontWeight: 700 }}>{cap(f.categoria)}</span>}
                   </div>
                 </div>
-                <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                  <span style={{ color: f.tipo==="entrada"?"#34d399":"#f87171", fontWeight:700, fontSize:15 }}>{f.tipo==="saida"?"-":"+"}{fmtMoeda(f.valor)}</span>
-                  <button onClick={()=>handleDelete(f.id)} style={{ background:"none", border:"none", cursor:"pointer", padding:4 }}><Icon name="trash" size={14} color="#ef4444" /></button>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ color: f.tipo === "entrada" ? C.green : C.red, fontWeight: 800, fontSize: 13 }}>{f.tipo === "saida" ? "-" : "+"}{R(f.valor)}</span>
+                  <button onClick={() => del(f.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 3, display: "flex" }}><Ic n="trs" sz={13} c={C.red} /></button>
                 </div>
               </div>
             ))}
@@ -714,82 +901,122 @@ const Financeiro = ({ financeiro, toast, reload }) => {
 // RELATÓRIOS
 // ============================================================
 const Relatorios = ({ moradores, pagamentos, financeiro }) => {
-  const [filtros, setFiltros] = useState({ tipo:"todos", mes:"", dataInicio:"", dataFim:"", categoria:"" });
-  const getMoradorNome = (casaId) => moradores.find(m=>m.casa_id===casaId)?.nome || casaId;
+  const [filtros, setFiltros] = useState({ tipo: "todos", mes: "", dataInicio: "", dataFim: "", categoria: "" });
+  const getNome = (id) => moradores.find(m => m.casa_id === id)?.nome || id;
 
   const allItems = [
-    ...pagamentos.map(p=>({ id:p.id, tipo:"entrada", descricao:`Mensalidade — ${getMoradorNome(p.casa_id)} (${p.casa_id})`, valor:p.valor, data:p.data_pagamento?.split("T")[0]||"", categoria:"mensalidade", sub:capFirst(formatMes(p.mes)) })),
-    ...financeiro.map(f=>({ ...f, sub:f.categoria?capFirst(f.categoria):undefined })),
-  ].filter(i=>{
-    if (filtros.tipo!=="todos" && i.tipo!==filtros.tipo) return false;
-    if (filtros.categoria && i.categoria!==filtros.categoria) return false;
-    const d = new Date((i.data||"")+"T12:00:00");
-    if (filtros.mes) { const [y,m]=filtros.mes.split("-"); if(d.getFullYear()!==+y||d.getMonth()+1!==+m) return false; }
-    if (filtros.dataInicio && d<new Date(filtros.dataInicio+"T00:00:00")) return false;
-    if (filtros.dataFim   && d>new Date(filtros.dataFim+"T23:59:59"))   return false;
+    ...pagamentos.map(p => ({ id: p.id, tipo: "entrada", descricao: `MENSALIDADE — ${getNome(p.casa_id)} (${p.casa_id})`, valor: p.valor, data: p.data_pagamento?.split("T")[0] || "", categoria: "mensalidade", sub: cap(fmtMes(p.mes)) })),
+    ...financeiro.map(f => ({ ...f, sub: f.categoria ? cap(f.categoria) : undefined })),
+  ].filter(i => {
+    if (filtros.tipo !== "todos" && i.tipo !== filtros.tipo) return false;
+    if (filtros.categoria && i.categoria !== filtros.categoria) return false;
+    const d = new Date((i.data || "") + "T12:00:00");
+    if (filtros.mes) { const [y, m] = filtros.mes.split("-"); if (d.getFullYear() !== +y || d.getMonth() + 1 !== +m) return false; }
+    if (filtros.dataInicio && d < new Date(filtros.dataInicio + "T00:00:00")) return false;
+    if (filtros.dataFim    && d > new Date(filtros.dataFim + "T23:59:59"))    return false;
     return true;
-  }).sort((a,b)=>new Date(b.data)-new Date(a.data));
+  }).sort((a, b) => new Date(b.data) - new Date(a.data));
 
-  const totais = allItems.reduce((acc,i)=>{ acc[i.tipo]+=i.valor; return acc; },{entrada:0,saida:0});
+  const tot = allItems.reduce((a, i) => { a[i.tipo] += i.valor; return a; }, { entrada: 0, saida: 0 });
+
+  // Agrupar por mês para exibição estilo extrato
+  const grupos = allItems.reduce((acc, i) => {
+    const k = i.data?.slice(0, 7) || "";
+    if (!acc[k]) acc[k] = [];
+    acc[k].push(i);
+    return acc;
+  }, {});
+
+  const limpar = () => setFiltros({ tipo: "todos", mes: "", dataInicio: "", dataFim: "", categoria: "" });
+  const filtroAtivo = filtros.mes || filtros.dataInicio || filtros.dataFim || filtros.categoria || filtros.tipo !== "todos";
 
   return (
-    <div style={{ padding:"20px 16px", paddingBottom:80 }}>
-      <h1 style={{ color:"#f1f5f9", fontSize:22, fontWeight:800, marginBottom:16 }}>Relatórios</h1>
+    <div style={{ padding: "20px 16px 88px" }}>
+      <h1 style={{ color: C.text, fontSize: 22, fontWeight: 900, marginBottom: 14 }}>📊 Relatórios</h1>
 
-      <div style={{ background:"#1e293b", borderRadius:16, padding:"16px 20px", marginBottom:16 }}>
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12 }}>
-          <div><div style={{ color:"#64748b", fontSize:11 }}>Entradas</div><div style={{ color:"#34d399", fontWeight:800, fontSize:14, marginTop:2 }}>{fmtMoeda(totais.entrada)}</div></div>
-          <div><div style={{ color:"#64748b", fontSize:11 }}>Saídas</div><div style={{ color:"#f87171", fontWeight:800, fontSize:14, marginTop:2 }}>{fmtMoeda(totais.saida)}</div></div>
-          <div><div style={{ color:"#64748b", fontSize:11 }}>Saldo</div><div style={{ color:totais.entrada-totais.saida>=0?"#38bdf8":"#f87171", fontWeight:800, fontSize:14, marginTop:2 }}>{fmtMoeda(totais.entrada-totais.saida)}</div></div>
+      {/* Resumo */}
+      <Crd sx={{ marginBottom: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+          {[
+            { lb: "Entradas", val: tot.entrada, c: C.green  },
+            { lb: "Saídas",   val: tot.saida,   c: C.red    },
+            { lb: "Saldo",    val: tot.entrada - tot.saida, c: tot.entrada - tot.saida >= 0 ? C.accent : C.red },
+          ].map(x => (
+            <div key={x.lb} style={{ textAlign: "center", padding: "4px 0", borderRight: x.lb !== "Saldo" ? `1px solid ${C.border}` : "none" }}>
+              <div style={{ color: C.muted, fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: .5 }}>{x.lb}</div>
+              <div style={{ color: x.c, fontWeight: 800, fontSize: 13, marginTop: 5 }}>{R(x.val)}</div>
+            </div>
+          ))}
         </div>
-      </div>
+      </Crd>
 
-      <div style={{ background:"#1e293b", borderRadius:16, padding:"16px", marginBottom:16 }}>
-        <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:10 }}>
-          {[["todos","Todos"],["entrada","Entradas"],["saida","Saídas"]].map(([v,l])=>(
-            <button key={v} onClick={()=>setFiltros(p=>({...p,tipo:v}))}
-              style={{ padding:"6px 14px", borderRadius:8, border:`1px solid ${filtros.tipo===v?"#38bdf8":"#334155"}`, background: filtros.tipo===v?"#38bdf815":"transparent", color: filtros.tipo===v?"#38bdf8":"#64748b", fontSize:12, cursor:"pointer" }}>
+      {/* Filtros */}
+      <Crd sx={{ marginBottom: 14 }}>
+        <div style={{ display: "flex", gap: 6, marginBottom: 9 }}>
+          {[["todos", "Todos"], ["entrada", "📈 Entradas"], ["saida", "📉 Saídas"]].map(([v, l]) => (
+            <button key={v} onClick={() => setFiltros(p => ({ ...p, tipo: v }))}
+              style={{ flex: 1, padding: "7px 4px", borderRadius: 8, border: `1px solid ${filtros.tipo === v ? C.accent : C.border2}`, background: filtros.tipo === v ? `${C.accent}18` : "transparent", color: filtros.tipo === v ? C.accent : C.muted, fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
               {l}
             </button>
           ))}
         </div>
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
-          <input type="month" value={filtros.mes} onChange={e=>setFiltros(p=>({...p,mes:e.target.value}))}
-            style={{ background:"#0f172a", border:"1px solid #334155", borderRadius:8, padding:"8px 10px", color:"#f1f5f9", fontSize:12, outline:"none" }} />
-          <input type="date" value={filtros.dataInicio} onChange={e=>setFiltros(p=>({...p,dataInicio:e.target.value}))}
-            style={{ background:"#0f172a", border:"1px solid #334155", borderRadius:8, padding:"8px 10px", color:"#f1f5f9", fontSize:12, outline:"none" }} />
-          <input type="date" value={filtros.dataFim} onChange={e=>setFiltros(p=>({...p,dataFim:e.target.value}))}
-            style={{ background:"#0f172a", border:"1px solid #334155", borderRadius:8, padding:"8px 10px", color:"#f1f5f9", fontSize:12, outline:"none" }} />
-          <select value={filtros.categoria} onChange={e=>setFiltros(p=>({...p,categoria:e.target.value}))}
-            style={{ background:"#0f172a", border:"1px solid #334155", borderRadius:8, padding:"8px 10px", color:"#f1f5f9", fontSize:12, outline:"none" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
+          <input type="month" value={filtros.mes} onChange={e => setFiltros(p => ({ ...p, mes: e.target.value }))}
+            style={{ background: C.bg, border: `1px solid ${C.border2}`, borderRadius: 8, padding: "8px 9px", color: C.text, fontSize: 11, outline: "none", fontFamily: "inherit" }} />
+          <select value={filtros.categoria} onChange={e => setFiltros(p => ({ ...p, categoria: e.target.value }))}
+            style={{ background: C.bg, border: `1px solid ${C.border2}`, borderRadius: 8, padding: "8px 9px", color: C.text, fontSize: 11, outline: "none", fontFamily: "inherit" }}>
             <option value="">Todas categ.</option>
             <option value="mensalidade">Mensalidade</option>
-            {CATEGORIAS.map(c=><option key={c} value={c}>{capFirst(c)}</option>)}
+            {CATEGORIAS.map(c => <option key={c} value={c}>{cap(c)}</option>)}
           </select>
+          <input type="date" value={filtros.dataInicio} onChange={e => setFiltros(p => ({ ...p, dataInicio: e.target.value }))}
+            style={{ background: C.bg, border: `1px solid ${C.border2}`, borderRadius: 8, padding: "8px 9px", color: C.text, fontSize: 11, outline: "none", fontFamily: "inherit" }} />
+          <input type="date" value={filtros.dataFim} onChange={e => setFiltros(p => ({ ...p, dataFim: e.target.value }))}
+            style={{ background: C.bg, border: `1px solid ${C.border2}`, borderRadius: 8, padding: "8px 9px", color: C.text, fontSize: 11, outline: "none", fontFamily: "inherit" }} />
         </div>
-      </div>
+        {filtroAtivo && (
+          <button onClick={limpar} style={{ background: "none", border: "none", color: C.muted, fontSize: 11, cursor: "pointer", marginTop: 7, padding: 0, fontFamily: "inherit" }}>
+            ✕ Limpar filtros
+          </button>
+        )}
+      </Crd>
 
-      {allItems.length===0
-        ? <div style={{ textAlign:"center", color:"#64748b", marginTop:40, fontSize:14 }}>Nenhum registro encontrado</div>
-        : <div style={{ background:"#1e293b", borderRadius:16, overflow:"hidden" }}>
-            {allItems.map((item,i)=>(
-              <div key={item.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"14px 16px", borderBottom: i<allItems.length-1?"1px solid #0f172a":"none" }}>
-                <div style={{ width:36, height:36, borderRadius:10, background: item.tipo==="entrada"?"#10b98122":"#ef444422", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                  <Icon name={item.tipo==="entrada"?"arrow_up":"arrow_down"} size={16} color={item.tipo==="entrada"?"#34d399":"#f87171"} />
+      {/* Extrato agrupado */}
+      {Object.keys(grupos).length === 0
+        ? <div style={{ textAlign: "center", color: C.muted, marginTop: 40, fontSize: 13 }}>Nenhum registro encontrado</div>
+        : Object.entries(grupos).sort(([a], [b]) => b.localeCompare(a)).map(([chave, items]) => {
+            const totG = items.reduce((a, i) => { a[i.tipo] += i.valor; return a; }, { entrada: 0, saida: 0 });
+            const mesLabel = chave ? cap(fmtMes(chave.split("-").reverse().join("-"))) : "Sem data";
+            return (
+              <div key={chave} style={{ marginBottom: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <span style={{ color: C.sub, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: .5 }}>{mesLabel}</span>
+                  <span style={{ color: totG.entrada - totG.saida >= 0 ? C.green : C.red, fontSize: 11, fontWeight: 700 }}>
+                    {totG.entrada - totG.saida >= 0 ? "+" : ""}{R(totG.entrada - totG.saida)}
+                  </span>
                 </div>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ color:"#f1f5f9", fontWeight:500, fontSize:13, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{item.descricao}</div>
-                  <div style={{ display:"flex", gap:6, marginTop:2, alignItems:"center" }}>
-                    <span style={{ color:"#64748b", fontSize:11 }}>{fmtData(item.data)}</span>
-                    {item.sub&&<span style={{ background:"#334155", color:"#94a3b8", borderRadius:4, padding:"1px 6px", fontSize:10 }}>{item.sub}</span>}
-                  </div>
-                </div>
-                <span style={{ color: item.tipo==="entrada"?"#34d399":"#f87171", fontWeight:700, fontSize:14, flexShrink:0 }}>
-                  {item.tipo==="saida"?"-":"+"}{fmtMoeda(item.valor)}
-                </span>
+                <Crd sx={{ padding: 0, overflow: "hidden" }}>
+                  {items.map((item, i) => (
+                    <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 11, padding: "12px 15px", background: i % 2 === 0 ? C.card : C.card2, borderBottom: i < items.length - 1 ? `1px solid ${C.border}` : "none" }}>
+                      <div style={{ width: 32, height: 32, borderRadius: 8, background: item.tipo === "entrada" ? `${C.green}15` : `${C.red}15`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, flexShrink: 0 }}>
+                        {item.tipo === "entrada" ? "📈" : "📉"}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ color: C.text, fontWeight: 500, fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.descricao}</div>
+                        <div style={{ display: "flex", gap: 5, marginTop: 2, alignItems: "center" }}>
+                          <span style={{ color: C.muted, fontSize: 10 }}>{fmtData(item.data)}</span>
+                          {item.sub && <span style={{ background: C.border2, color: C.sub, borderRadius: 3, padding: "1px 5px", fontSize: 9, fontWeight: 700 }}>{item.sub}</span>}
+                        </div>
+                      </div>
+                      <span style={{ color: item.tipo === "entrada" ? C.green : C.red, fontWeight: 800, fontSize: 13, flexShrink: 0 }}>
+                        {item.tipo === "saida" ? "-" : "+"}{R(item.valor)}
+                      </span>
+                    </div>
+                  ))}
+                </Crd>
               </div>
-            ))}
-          </div>
+            );
+          })
       }
     </div>
   );
@@ -799,62 +1026,63 @@ const Relatorios = ({ moradores, pagamentos, financeiro }) => {
 // APP ROOT
 // ============================================================
 export default function App() {
-  const [page, setPage] = useState("dashboard");
-  const [selectedCasa, setSelectedCasa] = useState(null);
-  const [moradores, setMoradores] = useState([]);
-  const [pagamentos, setPagamentos] = useState([]);
-  const [financeiro, setFinanceiro] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [toasts, setToasts] = useState([]);
+  const [page,         setPage]        = useState("dashboard");
+  const [selectedCasa, setSelectedCasa]= useState(null);
+  const [moradores,    setMoradores]   = useState([]);
+  const [pagamentos,   setPagamentos]  = useState([]);
+  const [financeiro,   setFinanceiro]  = useState([]);
+  const [loading,      setLoading]     = useState(true);
+  const [toasts,       setToasts]      = useState([]);
 
-  const toast = (msg, type="success") => {
-    const id = Date.now();
-    setToasts(p=>[...p,{id,msg,type}]);
-    setTimeout(()=>setToasts(p=>p.filter(t=>t.id!==id)),3000);
-  };
+  const toast = useCallback((msg, type = "success") => {
+    const id = Date.now() + Math.random();
+    setToasts(p => [...p, { id, msg, type }]);
+    setTimeout(() => setToasts(p => p.filter(t => t.id !== id)), 3500);
+  }, []);
 
   const reload = useCallback(async () => {
     try {
-      const [m,p,f] = await Promise.all([api.getMoradores(), api.getPagamentos(), api.getFinanceiro()]);
+      const [m, p, f] = await Promise.all([api.getMoradores(), api.getPagamentos(), api.getFinanceiro()]);
       setMoradores(m); setPagamentos(p); setFinanceiro(f);
-    } catch(e) { toast("Erro ao carregar dados","error"); }
-  }, []);
+    } catch { toast("Erro ao carregar dados. Verifique a conexão.", "error"); }
+  }, [toast]);
 
-  useEffect(() => {
-    setLoading(true);
-    reload().finally(()=>setLoading(false));
-  }, [reload]);
+  useEffect(() => { setLoading(true); reload().finally(() => setLoading(false)); }, [reload]);
 
-  const navigateTo = (p) => { setPage(p); if(p!=="casa_detalhe") setSelectedCasa(null); };
+  const nav = (p) => { setPage(p); if (p !== "casa_detalhe") setSelectedCasa(null); };
 
   const renderPage = () => {
     if (loading) return <Spinner />;
-    switch(page) {
-      case "dashboard":    return <Dashboard   moradores={moradores} pagamentos={pagamentos} financeiro={financeiro} />;
-      case "casas":        return <Casas       moradores={moradores} pagamentos={pagamentos} setPage={navigateTo} setSelectedCasa={setSelectedCasa} />;
-      case "casa_detalhe": return selectedCasa ? <CasaDetalhe casa={selectedCasa} pagamentos={pagamentos} setPage={navigateTo} toast={toast} reload={reload} /> : <Casas moradores={moradores} pagamentos={pagamentos} setPage={navigateTo} setSelectedCasa={setSelectedCasa} />;
-      case "cadastro":     return <Cadastro    toast={toast} reload={reload} setPage={navigateTo} />;
-      case "financeiro":   return <Financeiro  financeiro={financeiro} toast={toast} reload={reload} />;
-      case "relatorios":   return <Relatorios  moradores={moradores} pagamentos={pagamentos} financeiro={financeiro} />;
-      default:             return <Dashboard   moradores={moradores} pagamentos={pagamentos} financeiro={financeiro} />;
+    switch (page) {
+      case "dashboard":    return <Dashboard    moradores={moradores} pagamentos={pagamentos} financeiro={financeiro} />;
+      case "casas":        return <Casas        moradores={moradores} pagamentos={pagamentos} setPage={nav} setSelectedCasa={setSelectedCasa} />;
+      case "casa_detalhe": return selectedCasa
+        ? <CasaDetalhe casa={selectedCasa} pagamentos={pagamentos} setPage={nav} toast={toast} reload={reload} />
+        : <Casas moradores={moradores} pagamentos={pagamentos} setPage={nav} setSelectedCasa={setSelectedCasa} />;
+      case "cadastro":     return <Cadastro     toast={toast} reload={reload} setPage={nav} />;
+      case "financeiro":   return <Financeiro   financeiro={financeiro} toast={toast} reload={reload} />;
+      case "relatorios":   return <Relatorios   moradores={moradores} pagamentos={pagamentos} financeiro={financeiro} />;
+      default:             return <Dashboard    moradores={moradores} pagamentos={pagamentos} financeiro={financeiro} />;
     }
   };
 
   return (
-    <div style={{ background:"#0f172a", minHeight:"100vh", maxWidth:480, margin:"0 auto", fontFamily:"'Plus Jakarta Sans','DM Sans',system-ui,sans-serif", position:"relative" }}>
+    <div style={{ background: C.bg, minHeight: "100vh", maxWidth: 480, margin: "0 auto", fontFamily: "'Plus Jakarta Sans','DM Sans',system-ui,sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
-        * { box-sizing:border-box; }
+        *{box-sizing:border-box;margin:0;padding:0}
         input[type="date"]::-webkit-calendar-picker-indicator,
-        input[type="month"]::-webkit-calendar-picker-indicator { filter:invert(1); }
-        @keyframes slideUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
-        @keyframes spin    { to{transform:rotate(360deg)} }
-        ::-webkit-scrollbar{width:4px} ::-webkit-scrollbar-track{background:#0f172a} ::-webkit-scrollbar-thumb{background:#334155;border-radius:4px}
+        input[type="month"]::-webkit-calendar-picker-indicator{filter:invert(.6)}
+        @keyframes slideUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        ::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#243652;border-radius:4px}
+        button{font-family:inherit}select option{background:#0f1929}
+        a{-webkit-tap-highlight-color:transparent}button{-webkit-tap-highlight-color:transparent}
       `}</style>
-      <div style={{ overflowY:"auto", height:"100vh" }}>
+      <div style={{ overflowY: "auto", height: "100vh" }}>
         {renderPage()}
       </div>
-      <BottomNav page={page} setPage={navigateTo} />
+      <BottomNav page={page} setPage={nav} />
       <ToastList toasts={toasts} />
     </div>
   );
