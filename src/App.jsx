@@ -24,9 +24,10 @@ const api = {
   getPagamentos:   ()      => sb("pagamentos?order=created_at.desc"),
   addPagamento:    (d)     => sb("pagamentos", { method: "POST", body: JSON.stringify(d) }),
   deletePagamento: (id)    => sb(`pagamentos?id=eq.${id}`, { method: "DELETE", prefer: "return=minimal" }),
-  getFinanceiro:   ()      => sb("financeiro?order=data.desc"),
-  addFinanceiro:   (d)     => sb("financeiro", { method: "POST", body: JSON.stringify(d) }),
-  deleteFinanceiro:(id)    => sb(`financeiro?id=eq.${id}`, { method: "DELETE", prefer: "return=minimal" }),
+  getFinanceiro:    ()      => sb("financeiro?order=data.desc"),
+  addFinanceiro:    (d)    => sb("financeiro", { method: "POST", body: JSON.stringify(d) }),
+  updateFinanceiro: (id,d) => sb(`financeiro?id=eq.${id}`, { method: "PATCH", body: JSON.stringify(d) }),
+  deleteFinanceiro: (id)   => sb(`financeiro?id=eq.${id}`, { method: "DELETE", prefer: "return=minimal" }),
 };
 
 // ============================================================
@@ -98,22 +99,7 @@ const maskCPF = (v) => {
 const waLink = (tel, nome, mes) => {
   const n = tel.replace(/\D/g, "");
   const fone = n.startsWith("55") ? n : `55${n}`;
-  const msg = encodeURIComponent(`Olá Sr. ${cap(nome)}, tudo bem?
-
-Referente ao Condomínio Boa Esperança, identificamos que a mensalidade de ${cap(fmtMes(mes))} encontra-se em aberto.
-
-Para sua comodidade, o pagamento pode ser realizado via PIX:
-
-🔑 Chave PIX: [SUA_CHAVE_AQUI]
-
-Solicitamos, por gentileza, a regularização o quanto antes para evitar possíveis encargos.
-
-Caso já tenha efetuado o pagamento, pedimos que desconsidere esta mensagem.
-
-Atenciosamente,
-Administração
-Condomínio Boa Esperança 🏘️
-`);
+  const msg = encodeURIComponent(`Olá ${cap(nome)}, sua mensalidade de ${cap(fmtMes(mes))} está pendente. Por favor, regularize o pagamento. Obrigado! 🏘️`);
   return `https://wa.me/${fone}?text=${msg}`;
 };
 
@@ -733,6 +719,77 @@ const Cadastro = ({ toast, reload, setPage }) => {
 };
 
 // ============================================================
+// MODAL EDIÇÃO FINANCEIRO
+// ============================================================
+const ModalEditFinanceiro = ({ item, onSave, onClose, saving }) => {
+  const [form, setForm] = useState({
+    tipo:      item.tipo,
+    descricao: item.descricao,
+    valor:     item.valor,
+    data:      item.data,
+    categoria: item.categoria || "",
+  });
+
+  const IS = { width:"100%", background:C.bg, border:`1.5px solid ${C.border2}`, borderRadius:11, padding:"10px 12px", color:C.text, fontSize:14, outline:"none", boxSizing:"border-box", fontFamily:"inherit" };
+  const LB = { color:C.sub, fontSize:11, fontWeight:700, display:"block", marginBottom:5, textTransform:"uppercase", letterSpacing:.5 };
+
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.82)", display:"flex", alignItems:"flex-end", zIndex:400 }} onClick={onClose}>
+      <div style={{ background:C.card, border:`1px solid ${C.border2}`, borderRadius:"22px 22px 0 0", padding:"24px 20px 32px", width:"100%", maxWidth:480, margin:"0 auto", boxSizing:"border-box" }} onClick={e=>e.stopPropagation()}>
+        <div style={{ width:36, height:4, background:C.border2, borderRadius:99, margin:"0 auto 18px" }}/>
+        <div style={{ color:C.text, fontWeight:800, fontSize:17, marginBottom:18 }}>✏️ Editar Lançamento</div>
+
+        {/* Tipo */}
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:14 }}>
+          {["entrada","saida"].map(t=>(
+            <button key={t} onClick={()=>setForm(p=>({...p,tipo:t}))}
+              style={{ padding:"10px", borderRadius:11, border:`1.5px solid ${form.tipo===t?(t==="entrada"?C.green:C.red):C.border2}`, background:form.tipo===t?(t==="entrada"?`${C.green}18`:`${C.red}18`):C.bg, color:form.tipo===t?(t==="entrada"?C.green:C.red):C.muted, fontWeight:700, fontSize:13, cursor:"pointer", fontFamily:"inherit" }}>
+              {t==="entrada"?"📈 Entrada":"📉 Saída"}
+            </button>
+          ))}
+        </div>
+
+        {/* Descrição */}
+        <div style={{ marginBottom:12 }}>
+          <label style={LB}>Descrição</label>
+          <input value={form.descricao} onChange={e=>setForm(p=>({...p,descricao:e.target.value}))} style={IS}/>
+        </div>
+
+        {/* Valor + Data */}
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:9, marginBottom:12 }}>
+          <div>
+            <label style={LB}>Valor (R$)</label>
+            <input type="number" value={form.valor} min="0" step="0.01" onChange={e=>setForm(p=>({...p,valor:e.target.value}))} style={IS}/>
+          </div>
+          <div>
+            <label style={LB}>Data</label>
+            <input type="date" value={form.data} onChange={e=>setForm(p=>({...p,data:e.target.value}))} style={IS}/>
+          </div>
+        </div>
+
+        {/* Categoria */}
+        <div style={{ marginBottom:18 }}>
+          <label style={LB}>Categoria</label>
+          <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+            {["",...CATEGORIAS].map(c=>(
+              <button key={c} onClick={()=>setForm(p=>({...p,categoria:c}))}
+                style={{ padding:"5px 11px", borderRadius:7, border:`1px solid ${form.categoria===c?C.accent:C.border2}`, background:form.categoria===c?`${C.accent}18`:"transparent", color:form.categoria===c?C.accent:C.muted, fontSize:11, fontWeight:600, cursor:"pointer", fontFamily:"inherit" }}>
+                {c||"Nenhuma"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:9 }}>
+          <Btn v="ghost" full sz="md" onClick={onClose}>Cancelar</Btn>
+          <Btn v="primary" full sz="md" loading={saving} onClick={()=>onSave(form)}>Salvar</Btn>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================
 // FINANCEIRO
 // ============================================================
 const Financeiro = ({ financeiro, toast, reload }) => {
@@ -741,6 +798,7 @@ const Financeiro = ({ financeiro, toast, reload }) => {
   const [showForm, setShowForm] = useState(false);
   const [saving,   setSaving]   = useState(false);
   const [erros,    setErros]    = useState({});
+  const [editItem, setEditItem] = useState(null); // item sendo editado
 
   const validar = () => {
     const e = {};
@@ -760,6 +818,15 @@ const Financeiro = ({ financeiro, toast, reload }) => {
       setForm({ tipo: "entrada", descricao: "", valor: "", data: new Date().toISOString().split("T")[0], categoria: "" });
       setShowForm(false); setErros({});
     } catch { toast("Erro ao salvar", "error"); } finally { setSaving(false); }
+  };
+
+  const salvarEdicao = async (form) => {
+    if (!form.descricao.trim() || !form.valor || +form.valor <= 0 || !form.data) { toast("Preencha todos os campos", "error"); return; }
+    setSaving(true);
+    try {
+      await api.updateFinanceiro(editItem.id, { ...form, descricao: up(form.descricao), valor: +form.valor });
+      await reload(); setEditItem(null); toast("Lançamento atualizado! ✅");
+    } catch { toast("Erro ao editar", "error"); } finally { setSaving(false); }
   };
 
   const del = async (id) => {
@@ -785,6 +852,8 @@ const Financeiro = ({ financeiro, toast, reload }) => {
 
   return (
     <div style={{ padding: "20px 16px 88px" }}>
+      {editItem && <ModalEditFinanceiro item={editItem} onSave={salvarEdicao} onClose={()=>setEditItem(null)} saving={saving}/>}
+
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <h1 style={{ color: C.text, fontSize: 22, fontWeight: 900, margin: 0 }}>💰 Financeiro</h1>
         <Btn v="primary" sz="sm" onClick={() => setShowForm(!showForm)}>
@@ -806,7 +875,7 @@ const Financeiro = ({ financeiro, toast, reload }) => {
         ))}
       </div>
 
-      {/* Formulário */}
+      {/* Formulário novo lançamento */}
       {showForm && (
         <Crd sx={{ marginBottom: 14 }}>
           <div style={{ color: C.text, fontWeight: 700, fontSize: 14, marginBottom: 14 }}>Nova Movimentação</div>
@@ -887,6 +956,7 @@ const Financeiro = ({ financeiro, toast, reload }) => {
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ color: f.tipo === "entrada" ? C.green : C.red, fontWeight: 800, fontSize: 13 }}>{f.tipo === "saida" ? "-" : "+"}{R(f.valor)}</span>
+                  <button onClick={() => setEditItem(f)} style={{ background: "none", border: "none", cursor: "pointer", padding: 3, display: "flex" }}><Ic n="edt" sz={13} c={C.accent} /></button>
                   <button onClick={() => del(f.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 3, display: "flex" }}><Ic n="trs" sz={13} c={C.red} /></button>
                 </div>
               </div>
@@ -898,126 +968,498 @@ const Financeiro = ({ financeiro, toast, reload }) => {
 };
 
 // ============================================================
+// RECIBO (abre nova aba com layout de impressão)
+// ============================================================
+const gerarRecibo = (pag, morador) => {
+  const nome  = morador ? cap(morador.nome) : "—";
+  const quadra= morador ? morador.quadra    : "—";
+  const casa  = morador ? morador.numero_casa:"—";
+  const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+<title>Recibo — ${nome}</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI',Arial,sans-serif;background:#f8fafc;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+  .recibo{background:#fff;border:2px solid #1e293b;border-radius:12px;width:100%;max-width:480px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.12)}
+  .header{background:#1e293b;color:#fff;padding:24px;text-align:center}
+  .header h1{font-size:20px;font-weight:800;margin-bottom:4px}
+  .header p{font-size:12px;opacity:.7}
+  .badge{display:inline-block;background:#10b981;color:#fff;border-radius:99px;padding:4px 14px;font-size:11px;font-weight:700;margin-top:10px;text-transform:uppercase;letter-spacing:1px}
+  .body{padding:24px}
+  .row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f1f5f9;font-size:14px}
+  .row:last-child{border-bottom:none}
+  .label{color:#64748b;font-weight:600}
+  .value{color:#0f172a;font-weight:700;text-align:right}
+  .valor-destaque{font-size:28px;font-weight:900;color:#10b981;text-align:center;padding:20px 0 8px}
+  .footer{background:#f8fafc;padding:16px 24px;text-align:center;font-size:11px;color:#94a3b8;border-top:1px solid #e2e8f0}
+  .assinatura{margin-top:40px;border-top:1px solid #cbd5e1;padding-top:10px;text-align:center;font-size:12px;color:#64748b}
+  @media print{body{background:#fff}.recibo{box-shadow:none;border:2px solid #000}}
+</style>
+</head><body>
+<div class="recibo">
+  <div class="header">
+    <h1>🏘️ Condomínio Boa Esperança</h1>
+    <p>Recibo de Pagamento</p>
+    <span class="badge">✓ Pago</span>
+  </div>
+  <div class="body">
+    <div class="valor-destaque">${R(pag.valor)}</div>
+    <div class="row"><span class="label">Morador</span><span class="value">${nome}</span></div>
+    <div class="row"><span class="label">Quadra / Casa</span><span class="value">${quadra} / ${casa}</span></div>
+    <div class="row"><span class="label">Mês de referência</span><span class="value">${cap(fmtMes(pag.mes))}</span></div>
+    <div class="row"><span class="label">Data do pagamento</span><span class="value">${fmtData(pag.data_pagamento)}</span></div>
+    <div class="row"><span class="label">Forma de pagamento</span><span class="value">${cap(pag.forma_pagamento)}</span></div>
+    <div class="row"><span class="label">Descrição</span><span class="value">Mensalidade condominial</span></div>
+    <div class="assinatura">
+      <p>_________________________________</p>
+      <p style="margin-top:6px">Assinatura do Administrador</p>
+      <p style="margin-top:4px;font-size:10px">Gerado em ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}</p>
+    </div>
+  </div>
+  <div class="footer">Este recibo comprova o pagamento da mensalidade referente ao período indicado.</div>
+</div>
+<script>setTimeout(()=>window.print(),400)</script>
+</body></html>`;
+  const w = window.open("","_blank");
+  w.document.write(html);
+  w.document.close();
+};
+
+// ============================================================
+// EXPORTAÇÕES — PDF e Excel
+// ============================================================
+const exportarPDF = async (moradores, pagamentos, financeiro, filtros, titulo) => {
+  // Carregar jsPDF dinamicamente
+  if (!window.jspdf) {
+    await new Promise((res, rej) => {
+      const s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+      s.onload = res; s.onerror = rej;
+      document.head.appendChild(s);
+    });
+  }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const pw = doc.internal.pageSize.getWidth();
+  let y = 20;
+
+  const addLine = (text, x, yy, size=10, bold=false, color=[0,0,0]) => {
+    doc.setFontSize(size);
+    doc.setFont("helvetica", bold ? "bold" : "normal");
+    doc.setTextColor(...color);
+    doc.text(text, x, yy);
+  };
+
+  const checkPage = () => { if (y > 270) { doc.addPage(); y = 20; } };
+
+  // Header
+  doc.setFillColor(30, 41, 59);
+  doc.rect(0, 0, pw, 28, "F");
+  addLine("Condomínio Boa Esperança", pw/2, 12, 16, true, [255,255,255]);
+  doc.setFontSize(9); doc.setTextColor(180,200,220);
+  doc.text(titulo, pw/2, 20, { align: "center" });
+  doc.text(`Gerado em ${new Date().toLocaleDateString("pt-BR")}`, pw/2, 25, { align: "center" });
+  y = 38;
+
+  // ─── Bloco Financeiro ─────────────────────────────────────
+  addLine("RESUMO FINANCEIRO", 14, y, 11, true, [59,130,246]); y += 7;
+  doc.setDrawColor(59,130,246); doc.line(14, y, pw-14, y); y += 6;
+
+  const allItems = [
+    ...pagamentos.map(p => {
+      const m = moradores.find(x=>x.casa_id===p.casa_id);
+      return { tipo:"entrada", descricao:`Mensalidade — ${m?cap(m.nome):p.casa_id}`, valor:p.valor, data:p.data_pagamento?.split("T")[0]||"" };
+    }),
+    ...financeiro.map(f => ({ ...f })),
+  ].filter(i => {
+    const d = new Date((i.data||"")+"T12:00:00");
+    if (filtros.mes) { const [y2,m2]=filtros.mes.split("-"); if(d.getFullYear()!==+y2||d.getMonth()+1!==+m2) return false; }
+    if (filtros.dataInicio && d<new Date(filtros.dataInicio+"T00:00:00")) return false;
+    if (filtros.dataFim    && d>new Date(filtros.dataFim+"T23:59:59"))    return false;
+    return true;
+  });
+
+  const tot = allItems.reduce((a,i)=>{ a[i.tipo]+=i.valor; return a; },{entrada:0,saida:0});
+  addLine(`Entradas:  ${R(tot.entrada)}`, 14, y, 10, false, [16,185,129]); y += 6;
+  addLine(`Saídas:    ${R(tot.saida)}`,   14, y, 10, false, [239,68,68]);  y += 6;
+  addLine(`Saldo:     ${R(tot.entrada-tot.saida)}`, 14, y, 10, true, tot.entrada-tot.saida>=0?[59,130,246]:[239,68,68]); y += 10;
+
+  // Tabela lançamentos
+  addLine("LANÇAMENTOS", 14, y, 10, true, [100,116,139]); y += 6;
+  const cols = [14, 50, 130, 158];
+  const hRow = (yy) => { doc.setFillColor(22,34,54); doc.rect(14, yy-5, pw-28, 7, "F"); };
+  hRow(y);
+  addLine("Data",     cols[0], y, 8, true, [200,220,240]);
+  addLine("Descrição",cols[1], y, 8, true, [200,220,240]);
+  addLine("Tipo",     cols[2], y, 8, true, [200,220,240]);
+  addLine("Valor",    cols[3], y, 8, true, [200,220,240]);
+  y += 6;
+
+  allItems.sort((a,b)=>new Date(b.data)-new Date(a.data)).forEach((item,i) => {
+    checkPage();
+    if (i%2===0) { doc.setFillColor(245,248,252); doc.rect(14, y-4, pw-28, 6, "F"); }
+    addLine(fmtData(item.data),                    cols[0], y, 8);
+    addLine(item.descricao.slice(0,40),             cols[1], y, 8);
+    addLine(item.tipo==="entrada"?"Entrada":"Saída",cols[2], y, 8, false, item.tipo==="entrada"?[16,185,129]:[239,68,68]);
+    addLine((item.tipo==="saida"?"-":"+")+R(item.valor), cols[3], y, 8, false, item.tipo==="entrada"?[16,185,129]:[239,68,68]);
+    y += 6;
+  });
+
+  y += 8; checkPage();
+
+  // ─── Bloco Moradores por Quadra ───────────────────────────
+  addLine("RELATÓRIO POR QUADRA", 14, y, 11, true, [59,130,246]); y += 7;
+  doc.setDrawColor(59,130,246); doc.line(14, y, pw-14, y); y += 6;
+
+  const mesRef = getMesNow();
+  const quadras = [...new Set(moradores.map(m=>m.quadra))].sort();
+  quadras.forEach(q => {
+    checkPage();
+    addLine(`Quadra ${q}`, 14, y, 10, true, [148,163,184]); y += 6;
+    moradores.filter(m=>m.quadra===q).sort((a,b)=>a.numero_casa.localeCompare(b.numero_casa,"pt-BR",{numeric:true})).forEach(m => {
+      checkPage();
+      const st = getStatus(m.casa_id, mesRef, pagamentos);
+      addLine(`Casa ${m.numero_casa}  ${cap(m.nome)}`, 18, y, 9);
+      addLine(st==="pago"?"✓ Adimplente":"✗ Inadimplente", 150, y, 9, true, st==="pago"?[16,185,129]:[239,68,68]);
+      y += 6;
+    });
+    y += 2;
+  });
+
+  doc.save(`relatorio-condominio-${new Date().toISOString().slice(0,10)}.pdf`);
+};
+
+const exportarExcel = async (moradores, pagamentos, financeiro) => {
+  if (!window.XLSX) {
+    await new Promise((res, rej) => {
+      const s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+      s.onload = res; s.onerror = rej;
+      document.head.appendChild(s);
+    });
+  }
+  const XLSX = window.XLSX;
+  const wb = XLSX.utils.book_new();
+
+  // Aba 1: Financeiro
+  const rowsFin = [
+    ["Data","Tipo","Descrição","Categoria","Valor (R$)"],
+    ...financeiro.map(f=>[fmtData(f.data), f.tipo==="entrada"?"Entrada":"Saída", f.descricao, f.categoria||"", f.valor]),
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rowsFin), "Financeiro");
+
+  // Aba 2: Mensalidades
+  const rowsPag = [
+    ["Casa","Morador","Mês","Valor","Data Pagamento","Forma"],
+    ...pagamentos.map(p=>{
+      const m = moradores.find(x=>x.casa_id===p.casa_id);
+      return [p.casa_id, m?cap(m.nome):"—", fmtMes(p.mes), p.valor, fmtData(p.data_pagamento), cap(p.forma_pagamento)];
+    }),
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rowsPag), "Mensalidades");
+
+  // Aba 3: Status por morador
+  const mesRef = getMesNow();
+  const rowsMor = [
+    ["Casa","Quadra","Nº","Nome","Telefone","Status " + cap(fmtMes(mesRef))],
+    ...moradores.sort((a,b)=>a.nome.localeCompare(b.nome,"pt-BR")).map(m=>[
+      m.casa_id, m.quadra, m.numero_casa, cap(m.nome), m.telefone,
+      getStatus(m.casa_id, mesRef, pagamentos)==="pago"?"Adimplente":"Inadimplente",
+    ]),
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rowsMor), "Moradores");
+
+  XLSX.writeFile(wb, `condominio-boa-esperanca-${new Date().toISOString().slice(0,10)}.xlsx`);
+};
+
+// ============================================================
 // RELATÓRIOS
 // ============================================================
 const Relatorios = ({ moradores, pagamentos, financeiro }) => {
+  const [aba,     setAba]     = useState("financeiro"); // financeiro | quadra | geral
   const [filtros, setFiltros] = useState({ tipo: "todos", mes: "", dataInicio: "", dataFim: "", categoria: "" });
+  const [mesQuadra, setMesQuadra] = useState(getMesNow());
+  const [exportando, setExportando] = useState(false);
+
   const getNome = (id) => moradores.find(m => m.casa_id === id)?.nome || id;
 
+  // ── Dados financeiros ──────────────────────────────────────
   const allItems = [
-    ...pagamentos.map(p => ({ id: p.id, tipo: "entrada", descricao: `MENSALIDADE — ${getNome(p.casa_id)} (${p.casa_id})`, valor: p.valor, data: p.data_pagamento?.split("T")[0] || "", categoria: "mensalidade", sub: cap(fmtMes(p.mes)) })),
-    ...financeiro.map(f => ({ ...f, sub: f.categoria ? cap(f.categoria) : undefined })),
+    ...pagamentos.map(p => ({ id:p.id, tipo:"entrada", descricao:`MENSALIDADE — ${getNome(p.casa_id)} (${p.casa_id})`, valor:p.valor, data:p.data_pagamento?.split("T")[0]||"", categoria:"mensalidade", sub:cap(fmtMes(p.mes)), _pag:p })),
+    ...financeiro.map(f => ({ ...f, sub:f.categoria?cap(f.categoria):undefined })),
   ].filter(i => {
     if (filtros.tipo !== "todos" && i.tipo !== filtros.tipo) return false;
     if (filtros.categoria && i.categoria !== filtros.categoria) return false;
-    const d = new Date((i.data || "") + "T12:00:00");
-    if (filtros.mes) { const [y, m] = filtros.mes.split("-"); if (d.getFullYear() !== +y || d.getMonth() + 1 !== +m) return false; }
-    if (filtros.dataInicio && d < new Date(filtros.dataInicio + "T00:00:00")) return false;
-    if (filtros.dataFim    && d > new Date(filtros.dataFim + "T23:59:59"))    return false;
+    const d = new Date((i.data||"")+"T12:00:00");
+    if (filtros.mes) { const [y,m]=filtros.mes.split("-"); if(d.getFullYear()!==+y||d.getMonth()+1!==+m) return false; }
+    if (filtros.dataInicio && d<new Date(filtros.dataInicio+"T00:00:00")) return false;
+    if (filtros.dataFim    && d>new Date(filtros.dataFim+"T23:59:59"))    return false;
     return true;
-  }).sort((a, b) => new Date(b.data) - new Date(a.data));
+  }).sort((a,b)=>new Date(b.data)-new Date(a.data));
 
-  const tot = allItems.reduce((a, i) => { a[i.tipo] += i.valor; return a; }, { entrada: 0, saida: 0 });
+  const tot = allItems.reduce((a,i)=>{ a[i.tipo]+=i.valor; return a; },{entrada:0,saida:0});
+  const grupos = allItems.reduce((acc,i)=>{ const k=i.data?.slice(0,7)||""; if(!acc[k]) acc[k]=[]; acc[k].push(i); return acc; },{});
 
-  // Agrupar por mês para exibição estilo extrato
-  const grupos = allItems.reduce((acc, i) => {
-    const k = i.data?.slice(0, 7) || "";
-    if (!acc[k]) acc[k] = [];
-    acc[k].push(i);
-    return acc;
-  }, {});
+  // ── Dados por quadra ───────────────────────────────────────
+  const quadras = [...new Set(moradores.map(m=>m.quadra))].sort();
 
-  const limpar = () => setFiltros({ tipo: "todos", mes: "", dataInicio: "", dataFim: "", categoria: "" });
-  const filtroAtivo = filtros.mes || filtros.dataInicio || filtros.dataFim || filtros.categoria || filtros.tipo !== "todos";
+  const limpar = () => setFiltros({ tipo:"todos", mes:"", dataInicio:"", dataFim:"", categoria:"" });
+  const filtroAtivo = filtros.mes||filtros.dataInicio||filtros.dataFim||filtros.categoria||filtros.tipo!=="todos";
+
+  const handlePDF = async () => {
+    setExportando(true);
+    try { await exportarPDF(moradores, pagamentos, financeiro, filtros, "Relatório Geral"); }
+    catch { alert("Erro ao gerar PDF"); }
+    finally { setExportando(false); }
+  };
+
+  const handleExcel = async () => {
+    setExportando(true);
+    try { await exportarExcel(moradores, pagamentos, financeiro); }
+    catch { alert("Erro ao gerar Excel"); }
+    finally { setExportando(false); }
+  };
+
+  const IS11 = { background:C.bg, border:`1px solid ${C.border2}`, borderRadius:8, padding:"8px 9px", color:C.text, fontSize:11, outline:"none", fontFamily:"inherit" };
 
   return (
-    <div style={{ padding: "20px 16px 88px" }}>
-      <h1 style={{ color: C.text, fontSize: 22, fontWeight: 900, marginBottom: 14 }}>📊 Relatórios</h1>
+    <div style={{ padding:"20px 16px 88px" }}>
+      <h1 style={{ color:C.text, fontSize:22, fontWeight:900, marginBottom:14 }}>📊 Relatórios</h1>
 
-      {/* Resumo */}
-      <Crd sx={{ marginBottom: 14 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-          {[
-            { lb: "Entradas", val: tot.entrada, c: C.green  },
-            { lb: "Saídas",   val: tot.saida,   c: C.red    },
-            { lb: "Saldo",    val: tot.entrada - tot.saida, c: tot.entrada - tot.saida >= 0 ? C.accent : C.red },
-          ].map(x => (
-            <div key={x.lb} style={{ textAlign: "center", padding: "4px 0", borderRight: x.lb !== "Saldo" ? `1px solid ${C.border}` : "none" }}>
-              <div style={{ color: C.muted, fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: .5 }}>{x.lb}</div>
-              <div style={{ color: x.c, fontWeight: 800, fontSize: 13, marginTop: 5 }}>{R(x.val)}</div>
-            </div>
-          ))}
-        </div>
-      </Crd>
+      {/* Botões exportação */}
+      <div style={{ display:"flex", gap:8, marginBottom:14 }}>
+        <Btn v="danger" sz="sm" loading={exportando} onClick={handlePDF} sx={{ flex:1 }}>
+          📄 Exportar PDF
+        </Btn>
+        <Btn v="success" sz="sm" loading={exportando} onClick={handleExcel} sx={{ flex:1 }}>
+          📊 Exportar Excel
+        </Btn>
+      </div>
 
-      {/* Filtros */}
-      <Crd sx={{ marginBottom: 14 }}>
-        <div style={{ display: "flex", gap: 6, marginBottom: 9 }}>
-          {[["todos", "Todos"], ["entrada", "📈 Entradas"], ["saida", "📉 Saídas"]].map(([v, l]) => (
-            <button key={v} onClick={() => setFiltros(p => ({ ...p, tipo: v }))}
-              style={{ flex: 1, padding: "7px 4px", borderRadius: 8, border: `1px solid ${filtros.tipo === v ? C.accent : C.border2}`, background: filtros.tipo === v ? `${C.accent}18` : "transparent", color: filtros.tipo === v ? C.accent : C.muted, fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-              {l}
-            </button>
-          ))}
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
-          <input type="month" value={filtros.mes} onChange={e => setFiltros(p => ({ ...p, mes: e.target.value }))}
-            style={{ background: C.bg, border: `1px solid ${C.border2}`, borderRadius: 8, padding: "8px 9px", color: C.text, fontSize: 11, outline: "none", fontFamily: "inherit" }} />
-          <select value={filtros.categoria} onChange={e => setFiltros(p => ({ ...p, categoria: e.target.value }))}
-            style={{ background: C.bg, border: `1px solid ${C.border2}`, borderRadius: 8, padding: "8px 9px", color: C.text, fontSize: 11, outline: "none", fontFamily: "inherit" }}>
-            <option value="">Todas categ.</option>
-            <option value="mensalidade">Mensalidade</option>
-            {CATEGORIAS.map(c => <option key={c} value={c}>{cap(c)}</option>)}
-          </select>
-          <input type="date" value={filtros.dataInicio} onChange={e => setFiltros(p => ({ ...p, dataInicio: e.target.value }))}
-            style={{ background: C.bg, border: `1px solid ${C.border2}`, borderRadius: 8, padding: "8px 9px", color: C.text, fontSize: 11, outline: "none", fontFamily: "inherit" }} />
-          <input type="date" value={filtros.dataFim} onChange={e => setFiltros(p => ({ ...p, dataFim: e.target.value }))}
-            style={{ background: C.bg, border: `1px solid ${C.border2}`, borderRadius: 8, padding: "8px 9px", color: C.text, fontSize: 11, outline: "none", fontFamily: "inherit" }} />
-        </div>
-        {filtroAtivo && (
-          <button onClick={limpar} style={{ background: "none", border: "none", color: C.muted, fontSize: 11, cursor: "pointer", marginTop: 7, padding: 0, fontFamily: "inherit" }}>
-            ✕ Limpar filtros
+      {/* Abas */}
+      <div style={{ display:"flex", gap:6, marginBottom:14 }}>
+        {[["financeiro","💰 Financeiro"],["quadra","🏘️ Por Quadra"],["geral","📋 Geral"]].map(([k,l])=>(
+          <button key={k} onClick={()=>setAba(k)}
+            style={{ flex:1, padding:"8px 4px", borderRadius:10, border:`1.5px solid ${aba===k?C.accent:C.border}`, background:aba===k?`${C.accent}18`:"transparent", color:aba===k?C.accent:C.muted, fontSize:11, fontWeight:700, cursor:"pointer", fontFamily:"inherit" }}>
+            {l}
           </button>
-        )}
-      </Crd>
+        ))}
+      </div>
 
-      {/* Extrato agrupado */}
-      {Object.keys(grupos).length === 0
-        ? <div style={{ textAlign: "center", color: C.muted, marginTop: 40, fontSize: 13 }}>Nenhum registro encontrado</div>
-        : Object.entries(grupos).sort(([a], [b]) => b.localeCompare(a)).map(([chave, items]) => {
-            const totG = items.reduce((a, i) => { a[i.tipo] += i.valor; return a; }, { entrada: 0, saida: 0 });
-            const mesLabel = chave ? cap(fmtMes(chave.split("-").reverse().join("-"))) : "Sem data";
-            return (
-              <div key={chave} style={{ marginBottom: 16 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                  <span style={{ color: C.sub, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: .5 }}>{mesLabel}</span>
-                  <span style={{ color: totG.entrada - totG.saida >= 0 ? C.green : C.red, fontSize: 11, fontWeight: 700 }}>
-                    {totG.entrada - totG.saida >= 0 ? "+" : ""}{R(totG.entrada - totG.saida)}
-                  </span>
+      {/* ── ABA FINANCEIRO ─────────────────────────────── */}
+      {aba==="financeiro" && (
+        <>
+          <Crd sx={{ marginBottom:14 }}>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8 }}>
+              {[{lb:"Entradas",val:tot.entrada,c:C.green},{lb:"Saídas",val:tot.saida,c:C.red},{lb:"Saldo",val:tot.entrada-tot.saida,c:tot.entrada-tot.saida>=0?C.accent:C.red}].map(x=>(
+                <div key={x.lb} style={{ textAlign:"center", borderRight:x.lb!=="Saldo"?`1px solid ${C.border}`:"none", padding:"4px 0" }}>
+                  <div style={{ color:C.muted, fontSize:9, fontWeight:700, textTransform:"uppercase", letterSpacing:.5 }}>{x.lb}</div>
+                  <div style={{ color:x.c, fontWeight:800, fontSize:13, marginTop:5 }}>{R(x.val)}</div>
                 </div>
-                <Crd sx={{ padding: 0, overflow: "hidden" }}>
-                  {items.map((item, i) => (
-                    <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 11, padding: "12px 15px", background: i % 2 === 0 ? C.card : C.card2, borderBottom: i < items.length - 1 ? `1px solid ${C.border}` : "none" }}>
-                      <div style={{ width: 32, height: 32, borderRadius: 8, background: item.tipo === "entrada" ? `${C.green}15` : `${C.red}15`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, flexShrink: 0 }}>
-                        {item.tipo === "entrada" ? "📈" : "📉"}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ color: C.text, fontWeight: 500, fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.descricao}</div>
-                        <div style={{ display: "flex", gap: 5, marginTop: 2, alignItems: "center" }}>
-                          <span style={{ color: C.muted, fontSize: 10 }}>{fmtData(item.data)}</span>
-                          {item.sub && <span style={{ background: C.border2, color: C.sub, borderRadius: 3, padding: "1px 5px", fontSize: 9, fontWeight: 700 }}>{item.sub}</span>}
-                        </div>
-                      </div>
-                      <span style={{ color: item.tipo === "entrada" ? C.green : C.red, fontWeight: 800, fontSize: 13, flexShrink: 0 }}>
-                        {item.tipo === "saida" ? "-" : "+"}{R(item.valor)}
+              ))}
+            </div>
+          </Crd>
+
+          {/* Filtros */}
+          <Crd sx={{ marginBottom:14 }}>
+            <div style={{ display:"flex", gap:6, marginBottom:9 }}>
+              {[["todos","Todos"],["entrada","📈 Ent."],["saida","📉 Saí."]].map(([v,l])=>(
+                <button key={v} onClick={()=>setFiltros(p=>({...p,tipo:v}))}
+                  style={{ flex:1, padding:"7px 4px", borderRadius:8, border:`1px solid ${filtros.tipo===v?C.accent:C.border2}`, background:filtros.tipo===v?`${C.accent}18`:"transparent", color:filtros.tipo===v?C.accent:C.muted, fontSize:11, fontWeight:600, cursor:"pointer", fontFamily:"inherit" }}>
+                  {l}
+                </button>
+              ))}
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:7 }}>
+              <input type="month" value={filtros.mes} onChange={e=>setFiltros(p=>({...p,mes:e.target.value}))} style={IS11}/>
+              <select value={filtros.categoria} onChange={e=>setFiltros(p=>({...p,categoria:e.target.value}))} style={IS11}>
+                <option value="">Todas categ.</option>
+                <option value="mensalidade">Mensalidade</option>
+                {CATEGORIAS.map(c=><option key={c} value={c}>{cap(c)}</option>)}
+              </select>
+              <input type="date" value={filtros.dataInicio} onChange={e=>setFiltros(p=>({...p,dataInicio:e.target.value}))} style={IS11}/>
+              <input type="date" value={filtros.dataFim}    onChange={e=>setFiltros(p=>({...p,dataFim:e.target.value}))}    style={IS11}/>
+            </div>
+            {filtroAtivo && <button onClick={limpar} style={{ background:"none", border:"none", color:C.muted, fontSize:11, cursor:"pointer", marginTop:7, padding:0, fontFamily:"inherit" }}>✕ Limpar filtros</button>}
+          </Crd>
+
+          {/* Extrato agrupado por mês */}
+          {Object.keys(grupos).length===0
+            ? <div style={{ textAlign:"center", color:C.muted, marginTop:40, fontSize:13 }}>Nenhum registro encontrado</div>
+            : Object.entries(grupos).sort(([a],[b])=>b.localeCompare(a)).map(([chave,items])=>{
+                const totG = items.reduce((a,i)=>{ a[i.tipo]+=i.valor; return a; },{entrada:0,saida:0});
+                return (
+                  <div key={chave} style={{ marginBottom:16 }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+                      <span style={{ color:C.sub, fontSize:11, fontWeight:700, textTransform:"uppercase", letterSpacing:.5 }}>
+                        {chave ? cap(fmtMes(chave.split("-").reverse().join("-"))) : "Sem data"}
+                      </span>
+                      <span style={{ color:totG.entrada-totG.saida>=0?C.green:C.red, fontSize:11, fontWeight:700 }}>
+                        {totG.entrada-totG.saida>=0?"+":""}{R(totG.entrada-totG.saida)}
                       </span>
                     </div>
-                  ))}
+                    <Crd sx={{ padding:0, overflow:"hidden" }}>
+                      {items.map((item,i)=>(
+                        <div key={item.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"11px 14px", background:i%2===0?C.card:C.card2, borderBottom:i<items.length-1?`1px solid ${C.border}`:"none" }}>
+                          <div style={{ width:30, height:30, borderRadius:8, background:item.tipo==="entrada"?`${C.green}15`:`${C.red}15`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, flexShrink:0 }}>
+                            {item.tipo==="entrada"?"📈":"📉"}
+                          </div>
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ color:C.text, fontWeight:500, fontSize:12, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{item.descricao}</div>
+                            <div style={{ display:"flex", gap:5, marginTop:2, alignItems:"center" }}>
+                              <span style={{ color:C.muted, fontSize:10 }}>{fmtData(item.data)}</span>
+                              {item.sub && <span style={{ background:C.border2, color:C.sub, borderRadius:3, padding:"1px 5px", fontSize:9, fontWeight:700 }}>{item.sub}</span>}
+                            </div>
+                          </div>
+                          <div style={{ display:"flex", alignItems:"center", gap:6, flexShrink:0 }}>
+                            <span style={{ color:item.tipo==="entrada"?C.green:C.red, fontWeight:800, fontSize:12 }}>
+                              {item.tipo==="saida"?"-":"+"}{R(item.valor)}
+                            </span>
+                            {/* Botão recibo só para mensalidades */}
+                            {item._pag && (
+                              <button onClick={()=>{ const m=moradores.find(x=>x.casa_id===item._pag.casa_id); gerarRecibo(item._pag,m); }}
+                                style={{ background:`${C.accent}18`, border:`1px solid ${C.accent}33`, borderRadius:6, padding:"3px 7px", fontSize:9, fontWeight:700, color:C.accent, cursor:"pointer", whiteSpace:"nowrap" }}>
+                                🧾 Recibo
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </Crd>
+                  </div>
+                );
+              })
+          }
+        </>
+      )}
+
+      {/* ── ABA POR QUADRA ─────────────────────────────── */}
+      {aba==="quadra" && (
+        <>
+          <div style={{ marginBottom:14 }}><NavMes mes={mesQuadra} setMes={setMesQuadra}/></div>
+
+          {/* Resumo */}
+          {(() => {
+            const adim = moradores.filter(m=>getStatus(m.casa_id,mesQuadra,pagamentos)==="pago").length;
+            const inad = moradores.length - adim;
+            return (
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:9, marginBottom:14 }}>
+                {[{lb:"Total",val:moradores.length,c:C.accent},{lb:"Adimplentes",val:adim,c:C.green},{lb:"Inadimplentes",val:inad,c:C.red}].map(x=>(
+                  <Crd key={x.lb} sx={{ padding:"11px 10px", textAlign:"center", border:`1px solid ${x.c}20` }}>
+                    <div style={{ color:C.muted, fontSize:9, fontWeight:700, textTransform:"uppercase" }}>{x.lb}</div>
+                    <div style={{ color:x.c, fontSize:20, fontWeight:900, marginTop:5 }}>{x.val}</div>
+                  </Crd>
+                ))}
+              </div>
+            );
+          })()}
+
+          {quadras.map(q=>{
+            const daCasa = moradores.filter(m=>m.quadra===q).sort((a,b)=>a.numero_casa.localeCompare(b.numero_casa,"pt-BR",{numeric:true}));
+            const adimQ  = daCasa.filter(m=>getStatus(m.casa_id,mesQuadra,pagamentos)==="pago").length;
+            return (
+              <div key={q} style={{ marginBottom:16 }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+                  <span style={{ color:C.sub, fontWeight:800, fontSize:12, textTransform:"uppercase", letterSpacing:.5 }}>
+                    🏘️ Quadra {q}
+                  </span>
+                  <span style={{ color:C.muted, fontSize:11 }}>{adimQ}/{daCasa.length} pagos</span>
+                </div>
+                <Crd sx={{ padding:0, overflow:"hidden" }}>
+                  {daCasa.map((m,i)=>{
+                    const st = getStatus(m.casa_id, mesQuadra, pagamentos);
+                    return (
+                      <div key={m.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"11px 14px", background:i%2===0?C.card:C.card2, borderBottom:i<daCasa.length-1?`1px solid ${C.border}`:"none" }}>
+                        <div style={{ width:34, height:34, borderRadius:9, background:st==="pago"?`${C.green}15`:`${C.yellow}15`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, flexShrink:0 }}>
+                          🏠
+                        </div>
+                        <div style={{ flex:1 }}>
+                          <div style={{ color:C.text, fontWeight:600, fontSize:13 }}>{cap(m.nome)}</div>
+                          <div style={{ color:C.muted, fontSize:11, marginTop:2 }}>Casa {m.numero_casa} · {m.telefone}</div>
+                        </div>
+                        <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:5 }}>
+                          <span style={{ background:st==="pago"?`${C.green}18`:`${C.yellow}18`, color:st==="pago"?C.green:C.yellow, border:`1px solid ${st==="pago"?C.green:C.yellow}33`, borderRadius:20, padding:"2px 9px", fontSize:10, fontWeight:700 }}>
+                            {st==="pago"?"✅ Adimplente":"⏳ Inadimplente"}
+                          </span>
+                          {st!=="pago" && m.telefone && (
+                            <a href={waLink(m.telefone,m.nome,mesQuadra)} target="_blank" rel="noreferrer"
+                              style={{ background:"#25d36615", color:"#25d366", border:"1px solid #25d36630", borderRadius:6, padding:"2px 7px", fontSize:9, fontWeight:700, textDecoration:"none" }}>
+                              📱 WhatsApp
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </Crd>
               </div>
             );
-          })
-      }
+          })}
+        </>
+      )}
+
+      {/* ── ABA GERAL ───────────────────────────────────── */}
+      {aba==="geral" && (
+        <>
+          <Crd sx={{ marginBottom:14 }}>
+            <div style={{ color:C.text, fontWeight:700, fontSize:14, marginBottom:12 }}>📋 Relatório Consolidado</div>
+            <div style={{ color:C.sub, fontSize:12, lineHeight:1.7 }}>
+              Este relatório reúne em um único PDF:<br/>
+              • Resumo financeiro completo (entradas e saídas)<br/>
+              • Lista de todos os lançamentos<br/>
+              • Situação por quadra (adimplente / inadimplente)<br/>
+            </div>
+            <div style={{ marginTop:16 }}>
+              <Btn v="danger" full sz="lg" loading={exportando} onClick={handlePDF}>
+                📄 Gerar Relatório Geral em PDF
+              </Btn>
+            </div>
+            <div style={{ marginTop:10 }}>
+              <Btn v="success" full sz="lg" loading={exportando} onClick={handleExcel}>
+                📊 Exportar Planilha Excel (3 abas)
+              </Btn>
+            </div>
+          </Crd>
+
+          {/* Preview resumo */}
+          <Crd sx={{ marginBottom:14 }}>
+            <div style={{ color:C.text, fontWeight:700, fontSize:13, marginBottom:12 }}>💰 Resumo Financeiro Total</div>
+            {(()=>{
+              const tRec  = pagamentos.reduce((a,p)=>a+p.valor,0);
+              const tEnt  = financeiro.filter(f=>f.tipo==="entrada").reduce((a,f)=>a+f.valor,0);
+              const tSai  = financeiro.filter(f=>f.tipo==="saida").reduce((a,f)=>a+f.valor,0);
+              const saldo = tRec+tEnt-tSai;
+              return [
+                {lb:"Total mensalidades recebidas", val:R(tRec),     c:C.green },
+                {lb:"Outras entradas",               val:R(tEnt),     c:C.green },
+                {lb:"Total saídas",                  val:R(tSai),     c:C.red   },
+                {lb:"Saldo acumulado",               val:R(saldo),    c:saldo>=0?C.accent:C.red, bold:true },
+              ].map(x=>(
+                <div key={x.lb} style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:`1px solid ${C.border}` }}>
+                  <span style={{ color:C.sub, fontSize:12 }}>{x.lb}</span>
+                  <span style={{ color:x.c, fontWeight:x.bold?800:600, fontSize:12 }}>{x.val}</span>
+                </div>
+              ));
+            })()}
+          </Crd>
+
+          <Crd>
+            <div style={{ color:C.text, fontWeight:700, fontSize:13, marginBottom:12 }}>🏘️ Status — {cap(fmtMes(getMesNow()))}</div>
+            {quadras.map(q=>{
+              const daCasa = moradores.filter(m=>m.quadra===q);
+              const adim   = daCasa.filter(m=>getStatus(m.casa_id,getMesNow(),pagamentos)==="pago").length;
+              return (
+                <div key={q} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 0", borderBottom:`1px solid ${C.border}` }}>
+                  <span style={{ color:C.sub, fontSize:12 }}>Quadra {q} ({daCasa.length} casas)</span>
+                  <div style={{ display:"flex", gap:8, fontSize:11, fontWeight:700 }}>
+                    <span style={{ color:C.green }}>✅ {adim}</span>
+                    <span style={{ color:C.yellow }}>⏳ {daCasa.length-adim}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </Crd>
+        </>
+      )}
     </div>
   );
 };
