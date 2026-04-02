@@ -108,19 +108,19 @@ const waLink = (tel, nome, mes) => {
   const fone = n.startsWith("55") ? n : `55${n}`;
   const msg = encodeURIComponent(`Olá Sr. ${cap(nome)}, tudo bem?
 
-Referente ao Condomínio Boa Esperança, identificamos que a mensalidade de ${cap(fmtMes(mes))} encontra-se em aberto.
+A mensalidade de ${cap(fmtMes(mes))} do Condomínio Boa Esperança está em aberto.
 
-Para sua comodidade, o pagamento pode ser realizado via PIX:
+Sua contribuição é essencial para manter a organização e o bem-estar de todos.
 
-🔑 Chave PIX: 91980630277
+Pagamento via PIX:
+🔑 91980630277
+👤 MARCO A. M. DE SOUZA 
+🏦 NUBANK
 
-Solicitamos, por gentileza, a regularização o quanto antes para evitar possíveis encargos.
-
-Caso já tenha efetuado o pagamento, pedimos que desconsidere esta mensagem.
+Contamos com sua regularização.
 
 Atenciosamente,
-Administração
-Condomínio Boa Esperança 🏘️`);
+Administração 🏘️`);
   return `https://wa.me/${fone}?text=${msg}`;
 };
 
