@@ -57,13 +57,20 @@ const fmtData = (s) => s ? new Date(s + (s.includes("T") ? "" : "T12:00:00")).to
 const cap     = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s;
 const up      = (s) => s ? s.trim().toUpperCase() : s;
 
-const buildMes   = (d) => { const x = new Date(d); return `${String(x.getMonth() + 1).padStart(2, "0")}-${x.getFullYear()}`; };
-const getMesNow  = () => buildMes(new Date());
-const parseMes   = (m) => { const [mm, yy] = m.split("-"); return new Date(+yy, +mm - 1, 1); };
-const navMes     = (m, d) => { const x = parseMes(m); x.setMonth(x.getMonth() + d); return buildMes(x); };
-const fmtMes     = (m) => { const [mm, yy] = m.split("-"); return new Date(+yy, +mm - 1, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" }); };
-const fmtMesCurto= (m) => { const [mm, yy] = m.split("-"); return new Date(+yy, +mm - 1, 1).toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }); };
+// Formato interno do mês: "MM-YYYY" (ex: "04-2026")
+const buildMes    = (d) => { const x = new Date(d); return `${String(x.getMonth() + 1).padStart(2, "0")}-${x.getFullYear()}`; };
+const getMesNow   = () => buildMes(new Date());
+const parseMes    = (m) => { const [mm, yy] = m.split("-"); return new Date(+yy, +mm - 1, 1); };
+const navMes      = (m, d) => { const x = parseMes(m); x.setMonth(x.getMonth() + d); return buildMes(x); };
+const fmtMes      = (m) => { const [mm, yy] = m.split("-"); return new Date(+yy, +mm - 1, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" }); };
+const fmtMesCurto = (m) => { const [mm, yy] = m.split("-"); return new Date(+yy, +mm - 1, 1).toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }); };
 
+// Converte "MM-YYYY" → "YYYY-MM" para uso em input type="month" e filtros ISO
+const mesParaISO  = (m) => { const [mm, yy] = m.split("-"); return `${yy}-${mm}`; };
+// Converte "YYYY-MM" → "MM-YYYY"
+const isoParaMes  = (iso) => { const [yy, mm] = iso.split("-"); return `${mm}-${yy}`; };
+
+// Status calculado SEMPRE dinamicamente pelo mês informado — nunca salvo no banco
 const getStatus = (casaId, mes, pagamentos) =>
   pagamentos.some(p => p.casa_id === casaId && p.mes === (mes || getMesNow())) ? "pago" : "pendente";
 
@@ -99,7 +106,21 @@ const maskCPF = (v) => {
 const waLink = (tel, nome, mes) => {
   const n = tel.replace(/\D/g, "");
   const fone = n.startsWith("55") ? n : `55${n}`;
-  const msg = encodeURIComponent(`Olá ${cap(nome)}, sua mensalidade de ${cap(fmtMes(mes))} está pendente. Por favor, regularize o pagamento. Obrigado! 🏘️`);
+  const msg = encodeURIComponent(`Olá Sr. ${cap(nome)}, tudo bem?
+
+Referente ao Condomínio Boa Esperança, identificamos que a mensalidade de ${cap(fmtMes(mes))} encontra-se em aberto.
+
+Para sua comodidade, o pagamento pode ser realizado via PIX:
+
+🔑 Chave PIX: 91980630277
+
+Solicitamos, por gentileza, a regularização o quanto antes para evitar possíveis encargos.
+
+Caso já tenha efetuado o pagamento, pedimos que desconsidere esta mensagem.
+
+Atenciosamente,
+Administração
+Condomínio Boa Esperança 🏘️`);
   return `https://wa.me/${fone}?text=${msg}`;
 };
 
@@ -468,24 +489,66 @@ const Casas = ({ moradores, pagamentos, setPage, setSelectedCasa }) => {
 };
 
 // ============================================================
-// CASA DETALHE
+// CASA DETALHE — campo de edição extraído para evitar remount
 // ============================================================
-const CasaDetalhe = ({ casa, pagamentos, setPage, toast, reload }) => {
-  const [edit, setEdit]         = useState(false);
-  const [ed, setEd]             = useState({ ...casa });
-  const [modal, setModal]       = useState(false);
-  const [saving, setSaving]     = useState(false);
-  const [pf, setPf]             = useState({ valor: 150, forma: "pix", mes: getMesNow(), dt: new Date().toISOString().split("T")[0] });
+const EditField = ({ lb, value, onChange, type = "text", maxLength, inputMode }) => (
+  <div style={{ marginBottom: 12 }}>
+    <div style={{ color: C.muted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: .5, marginBottom: 4 }}>{lb}</div>
+    <input
+      type={type}
+      value={value || ""}
+      onChange={onChange}
+      maxLength={maxLength}
+      inputMode={inputMode}
+      style={{ width: "100%", background: C.bg, border: `1.5px solid ${C.border2}`, borderRadius: 10, padding: "9px 12px", color: C.text, fontSize: 13, outline: "none", boxSizing: "border-box", fontFamily: "inherit" }}
+    />
+  </div>
+);
 
-  const pags    = pagamentos.filter(p => p.casa_id === casa.casa_id).sort((a, b) => new Date(b.data_pagamento) - new Date(a.data_pagamento));
-  const stNow   = getStatus(casa.casa_id, null, pagamentos);
-  const s       = STATUS[stNow];
+const CasaDetalhe = ({ casa, pagamentos, setPage, toast, reload }) => {
+  const [edit,   setEdit]   = useState(false);
+  const [edNome, setEdNome] = useState(casa.nome       || "");
+  const [edTel,  setEdTel]  = useState(casa.telefone   || "");
+  const [edCpf,  setEdCpf]  = useState(casa.cpf        || "");
+  const [edQuad, setEdQuad] = useState(casa.quadra     || "");
+  const [edNum,  setEdNum]  = useState(casa.numero_casa|| "");
+  const [modal,  setModal]  = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [pf,     setPf]     = useState({ valor: 0.00, forma: "pix", mes: getMesNow(), dt: new Date().toISOString().split("T")[0] });
+
+  const pags  = pagamentos.filter(p => p.casa_id === casa.casa_id).sort((a, b) => new Date(b.data_pagamento) - new Date(a.data_pagamento));
+  const stNow = getStatus(casa.casa_id, null, pagamentos);
+  const s     = STATUS[stNow];
+
+  // Mensagem WA com dados do recibo
+  const waRecibo = (pag) => {
+    const n    = tel.replace(/\D/g, "");
+    const fone = n.startsWith("55") ? n : `55${n}`;
+    const txt  = encodeURIComponent(
+      `🧾 *Recibo de Pagamento*\n` +
+      `Condomínio Boa Esperança\n\n` +
+      `Morador: ${cap(casa.nome)}\n` +
+      `Casa: ${casa.casa_id}\n` +
+      `Mês: ${cap(fmtMes(pag.mes))}\n` +
+      `Valor: ${R(pag.valor)}\n` +
+      `Forma: ${cap(pag.forma_pagamento)}\n` +
+      `Data: ${fmtData(pag.data_pagamento)}\n\n` +
+      `✅ Pagamento confirmado.`
+    );
+    return `https://wa.me/${fone}?text=${txt}`;
+  };
+
+  const tel = casa.telefone || "";
 
   const salvarEdit = async () => {
-    if (!ed.nome || !ed.telefone || !ed.quadra || !ed.numero_casa) { toast("Preencha todos os campos obrigatórios", "error"); return; }
+    if (!edNome.trim() || !edTel.trim() || !edQuad.trim() || !edNum.trim()) { toast("Preencha todos os campos obrigatórios", "error"); return; }
+    if (!/^[A-Za-z]$/.test(edQuad.trim())) { toast("Quadra deve ser uma única letra (A-Z)", "error"); return; }
+    if (!/^\d{1,3}$/.test(edNum.trim()))   { toast("Número da casa deve ter até 3 dígitos", "error"); return; }
     setSaving(true);
     try {
-      await api.updateMorador(casa.id, { nome: up(ed.nome), telefone: ed.telefone, cpf: ed.cpf, quadra: up(ed.quadra), numero_casa: up(ed.numero_casa), casa_id: `${up(ed.quadra)}-${up(ed.numero_casa)}` });
+      const q = edQuad.trim().toUpperCase();
+      const n = edNum.trim();
+      await api.updateMorador(casa.id, { nome: up(edNome), telefone: edTel.trim(), cpf: edCpf.trim() || null, quadra: q, numero_casa: n, casa_id: `${q}-${n}` });
       await reload(); setEdit(false); toast("Dados atualizados! ✅");
     } catch { toast("Erro ao atualizar", "error"); } finally { setSaving(false); }
   };
@@ -511,17 +574,6 @@ const CasaDetalhe = ({ casa, pagamentos, setPage, toast, reload }) => {
     catch { toast("Erro ao excluir", "error"); }
   };
 
-  const F = ({ lb, field }) => (
-    <div style={{ marginBottom: 12 }}>
-      <div style={{ color: C.muted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: .5, marginBottom: 4 }}>{lb}</div>
-      {edit
-        ? <input value={ed[field] || ""} onChange={e => setEd(p => ({ ...p, [field]: e.target.value }))}
-            style={{ width: "100%", background: C.bg, border: `1.5px solid ${C.border2}`, borderRadius: 10, padding: "9px 12px", color: C.text, fontSize: 13, outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
-        : <div style={{ color: C.text, fontSize: 14, fontWeight: 600 }}>{casa[field] || "—"}</div>
-      }
-    </div>
-  );
-
   return (
     <div style={{ padding: "20px 16px 88px" }}>
       <button onClick={() => setPage("casas")} style={{ background: "none", border: "none", color: C.accent, cursor: "pointer", display: "flex", alignItems: "center", gap: 5, fontSize: 13, padding: 0, marginBottom: 16, fontWeight: 600, fontFamily: "inherit" }}>
@@ -542,15 +594,15 @@ const CasaDetalhe = ({ casa, pagamentos, setPage, toast, reload }) => {
         {stNow !== "pago" && (
           <Btn v="success" full sz="lg" onClick={() => setModal(true)}>✓ Marcar como Pago</Btn>
         )}
-        {stNow !== "pago" && casa.telefone && (
-          <a href={waLink(casa.telefone, casa.nome, getMesNow())} target="_blank" rel="noreferrer"
+        {stNow !== "pago" && tel && (
+          <a href={waLink(tel, casa.nome, getMesNow())} target="_blank" rel="noreferrer"
             style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "linear-gradient(135deg,#25d366,#128c7e)", borderRadius: 14, padding: "12px", color: "#fff", fontWeight: 700, fontSize: 14, textDecoration: "none" }}>
             <Ic n="ph" sz={17} c="#fff" /> Cobrar via WhatsApp
           </a>
         )}
       </div>
 
-      {/* Info */}
+      {/* Dados do morador */}
       <Crd sx={{ marginBottom: 12 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
           <span style={{ color: C.text, fontWeight: 700, fontSize: 14 }}>👤 Dados do Morador</span>
@@ -561,29 +613,67 @@ const CasaDetalhe = ({ casa, pagamentos, setPage, toast, reload }) => {
             }
           </div>
         </div>
-        <F lb="Nome"     field="nome"       />
-        <F lb="Telefone" field="telefone"   />
-        <F lb="CPF"      field="cpf"        />
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <F lb="Quadra"  field="quadra"     />
-          <F lb="Nº Casa" field="numero_casa"/>
-        </div>
+
+        {edit ? (
+          <>
+            <EditField lb="Nome"     value={edNome} onChange={e => setEdNome(e.target.value.toUpperCase())} />
+            <EditField lb="Telefone" value={edTel}  onChange={e => setEdTel(maskTel(e.target.value))} />
+            <EditField lb="CPF"      value={edCpf}  onChange={e => setEdCpf(maskCPF(e.target.value))} />
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <EditField lb="Quadra (1 letra)"
+                value={edQuad}
+                onChange={e => { const v = e.target.value.replace(/[^A-Za-z]/g,"").slice(0,1).toUpperCase(); setEdQuad(v); }}
+                maxLength={1}
+              />
+              <EditField lb="Nº Casa (máx 3 dígitos)"
+                value={edNum}
+                onChange={e => { const v = e.target.value.replace(/\D/g,"").slice(0,3); setEdNum(v); }}
+                inputMode="numeric"
+                maxLength={3}
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            {[["Nome", casa.nome],["Telefone", casa.telefone],["CPF", casa.cpf],["Quadra", casa.quadra],["Nº Casa", casa.numero_casa]].map(([lb, val]) => (
+              <div key={lb} style={{ marginBottom: 12 }}>
+                <div style={{ color: C.muted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: .5, marginBottom: 4 }}>{lb}</div>
+                <div style={{ color: C.text, fontSize: 14, fontWeight: 600 }}>{val || "—"}</div>
+              </div>
+            ))}
+          </>
+        )}
       </Crd>
 
-      {/* Histórico */}
+      {/* Histórico de Pagamentos com botão Recibo */}
       <Crd>
         <div style={{ color: C.text, fontWeight: 700, fontSize: 14, marginBottom: 12 }}>📋 Histórico de Pagamentos</div>
         {pags.length === 0
           ? <div style={{ color: C.muted, textAlign: "center", padding: "20px 0", fontSize: 13 }}>Nenhum pagamento registrado</div>
           : pags.map((p, i) => (
-            <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < pags.length - 1 ? `1px solid ${C.border}` : "none" }}>
-              <div>
-                <div style={{ color: C.text, fontWeight: 600, fontSize: 13 }}>{cap(fmtMes(p.mes))}</div>
-                <div style={{ color: C.muted, fontSize: 11, marginTop: 2 }}>{fmtData(p.data_pagamento)} · {cap(p.forma_pagamento)}</div>
+            <div key={p.id} style={{ padding: "11px 0", borderBottom: i < pags.length - 1 ? `1px solid ${C.border}` : "none" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={{ color: C.text, fontWeight: 600, fontSize: 13 }}>{cap(fmtMes(p.mes))}</div>
+                  <div style={{ color: C.muted, fontSize: 11, marginTop: 2 }}>{fmtData(p.data_pagamento)} · {cap(p.forma_pagamento)}</div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ color: C.green, fontWeight: 800, fontSize: 14 }}>{R(p.valor)}</span>
+                  <button onClick={() => delPag(p.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 3, display: "flex" }}><Ic n="trs" sz={13} c={C.red} /></button>
+                </div>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                <span style={{ color: C.green, fontWeight: 800, fontSize: 14 }}>{R(p.valor)}</span>
-                <button onClick={() => delPag(p.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 3, display: "flex" }}><Ic n="trs" sz={13} c={C.red} /></button>
+              {/* Botões de recibo — só para meses pagos */}
+              <div style={{ display: "flex", gap: 7, marginTop: 8 }}>
+                <button onClick={() => gerarRecibo(p, casa)}
+                  style={{ flex: 1, background: `${C.accent}15`, color: C.accent, border: `1px solid ${C.accent}30`, borderRadius: 8, padding: "6px 0", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                  🧾 Gerar Recibo (PDF)
+                </button>
+                {tel && (
+                  <a href={waRecibo(p)} target="_blank" rel="noreferrer"
+                    style={{ flex: 1, background: "#25d36615", color: "#25d366", border: "1px solid #25d36630", borderRadius: 8, padding: "6px 0", fontSize: 11, fontWeight: 700, textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+                    <Ic n="ph" sz={11} c="#25d366" /> Enviar via WhatsApp
+                  </a>
+                )}
               </div>
             </div>
           ))
@@ -597,22 +687,19 @@ const CasaDetalhe = ({ casa, pagamentos, setPage, toast, reload }) => {
             <div style={{ width: 36, height: 4, background: C.border2, borderRadius: 99, margin: "0 auto 20px" }} />
             <h2 style={{ color: C.text, fontSize: 17, fontWeight: 800, marginBottom: 18 }}>💳 Registrar Pagamento</h2>
 
-            {/* Mês */}
             <div style={{ marginBottom: 12 }}>
               <label style={{ color: C.sub, fontSize: 11, fontWeight: 700, display: "block", marginBottom: 5, textTransform: "uppercase", letterSpacing: .5 }}>Mês de referência</label>
-              <input type="month" value={pf.mes.split("-").reverse().join("-")}
-                onChange={e => { const [y, m] = e.target.value.split("-"); setPf(p => ({ ...p, mes: `${m}-${y}` })); }}
+              <input type="month" value={mesParaISO(pf.mes)}
+                onChange={e => setPf(p => ({ ...p, mes: isoParaMes(e.target.value) }))}
                 style={{ width: "100%", background: C.bg, border: `1.5px solid ${C.border2}`, borderRadius: 11, padding: "10px 12px", color: C.text, fontSize: 14, outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
             </div>
 
-            {/* Valor */}
             <div style={{ marginBottom: 12 }}>
               <label style={{ color: C.sub, fontSize: 11, fontWeight: 700, display: "block", marginBottom: 5, textTransform: "uppercase", letterSpacing: .5 }}>Valor (R$)</label>
               <input type="number" value={pf.valor} min="0" step="0.01" onChange={e => setPf(p => ({ ...p, valor: e.target.value }))}
                 style={{ width: "100%", background: C.bg, border: `1.5px solid ${C.border2}`, borderRadius: 11, padding: "10px 12px", color: C.text, fontSize: 14, outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
             </div>
 
-            {/* Data */}
             <div style={{ marginBottom: 12 }}>
               <label style={{ color: C.sub, fontSize: 11, fontWeight: 700, display: "block", marginBottom: 5, textTransform: "uppercase", letterSpacing: .5 }}>Data do pagamento</label>
               <input type="date" value={pf.dt} onChange={e => setPf(p => ({ ...p, dt: e.target.value }))}
@@ -620,7 +707,6 @@ const CasaDetalhe = ({ casa, pagamentos, setPage, toast, reload }) => {
               <div style={{ color: C.muted, fontSize: 11, marginTop: 4 }}>Pré-preenchida com hoje. Altere se necessário.</div>
             </div>
 
-            {/* Forma */}
             <div style={{ marginBottom: 18 }}>
               <label style={{ color: C.sub, fontSize: 11, fontWeight: 700, display: "block", marginBottom: 8, textTransform: "uppercase", letterSpacing: .5 }}>Forma de pagamento</label>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
@@ -661,8 +747,10 @@ const Cadastro = ({ toast, reload, setPage }) => {
     if (!tel.trim())   e.tel  = "Telefone é obrigatório";
     else if (!validarTel(tel)) e.tel = "Formato inválido. Ex: (91) 99999-9999";
     if (cpf && !validarCPF(cpf)) e.cpf = "CPF inválido";
-    if (!quadra.trim()) e.quadra = "Quadra obrigatória";
-    if (!num.trim())    e.num   = "Número obrigatório";
+    if (!quadra.trim())              e.quadra = "Quadra obrigatória";
+    else if (!/^[A-Z]$/.test(quadra)) e.quadra = "Apenas 1 letra (ex: A)";
+    if (!num.trim())                 e.num = "Número obrigatório";
+    else if (!/^\d{1,3}$/.test(num)) e.num = "Apenas números, máx 3 dígitos";
     setErros(e);
     return Object.keys(e).length === 0;
   };
@@ -671,7 +759,7 @@ const Cadastro = ({ toast, reload, setPage }) => {
     if (!validar()) { toast("Corrija os campos destacados", "error"); return; }
     setSaving(true);
     try {
-      await api.addMorador({ nome: up(nome), telefone: tel.trim(), cpf: cpf.trim() || null, quadra: up(quadra), numero_casa: up(num), casa_id: `${up(quadra)}-${up(num)}` });
+      await api.addMorador({ nome: up(nome), telefone: tel.trim(), cpf: cpf.trim() || null, quadra, numero_casa: num, casa_id: `${quadra}-${num}` });
       await reload();
       toast("Condômino cadastrado! 🎉");
       setNome(""); setTel(""); setCpf(""); setQuadra(""); setNum(""); setErros({});
@@ -679,34 +767,53 @@ const Cadastro = ({ toast, reload, setPage }) => {
     } catch { toast("Erro ao cadastrar", "error"); } finally { setSaving(false); }
   };
 
+  const IS = (err) => ({ width: "100%", background: C.bg, border: `1.5px solid ${err ? C.red : C.border2}`, borderRadius: 11, padding: "11px 13px", color: C.text, fontSize: 14, outline: "none", boxSizing: "border-box", fontFamily: "inherit" });
+  const LB = { color: C.sub, fontSize: 11, fontWeight: 700, display: "block", marginBottom: 5, textTransform: "uppercase", letterSpacing: .5 };
+
   return (
     <div style={{ padding: "20px 16px 88px" }}>
       <h1 style={{ color: C.text, fontSize: 22, fontWeight: 900, marginBottom: 4 }}>➕ Novo Condômino</h1>
       <p style={{ color: C.muted, fontSize: 12, marginBottom: 18 }}>Preencha os dados do morador</p>
 
       <Crd>
-        <Inp label="Nome Completo" value={nome} onChange={e => { setNome(e.target.value); setErros(p => ({ ...p, nome: undefined })); }} placeholder="JOÃO DA SILVA" required err={erros.nome} />
+        <Inp label="Nome Completo" value={nome} onChange={e => { setNome(e.target.value.toUpperCase()); setErros(p => ({ ...p, nome: undefined })); }} placeholder="JOÃO DA SILVA" required err={erros.nome} />
         <Inp label="Telefone" value={tel} onChange={e => { setTel(maskTel(e.target.value)); setErros(p => ({ ...p, tel: undefined })); }} placeholder="(91) 99999-9999" required err={erros.tel} hint="Usado para cobranças via WhatsApp" />
         <Inp label="CPF (opcional)" value={cpf} onChange={e => { setCpf(maskCPF(e.target.value)); setErros(p => ({ ...p, cpf: undefined })); }} placeholder="000.000.000-00" err={erros.cpf} />
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          {/* Quadra: apenas 1 letra A-Z */}
           <div>
-            <label style={{ color: C.sub, fontSize: 11, fontWeight: 700, display: "block", marginBottom: 5, textTransform: "uppercase", letterSpacing: .5 }}>Quadra <span style={{ color: C.red }}>*</span></label>
-            <input value={quadra} onChange={e => { setQuadra(e.target.value.toUpperCase()); setErros(p => ({ ...p, quadra: undefined })); }} placeholder="A"
-              style={{ width: "100%", background: C.bg, border: `1.5px solid ${erros.quadra ? C.red : C.border2}`, borderRadius: 11, padding: "11px 13px", color: C.text, fontSize: 14, outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
+            <label style={LB}>Quadra <span style={{ color: C.red }}>*</span></label>
+            <input
+              value={quadra}
+              onChange={e => { const v = e.target.value.replace(/[^A-Za-z]/g, "").slice(0, 1).toUpperCase(); setQuadra(v); setErros(p => ({ ...p, quadra: undefined })); }}
+              placeholder="A"
+              maxLength={1}
+              style={IS(erros.quadra)}
+            />
             {erros.quadra && <div style={{ color: C.red, fontSize: 11, marginTop: 3 }}>⚠ {erros.quadra}</div>}
+            {!erros.quadra && <div style={{ color: C.muted, fontSize: 10, marginTop: 3 }}>Somente 1 letra</div>}
           </div>
+
+          {/* Número: apenas dígitos, máx 3 */}
           <div>
-            <label style={{ color: C.sub, fontSize: 11, fontWeight: 700, display: "block", marginBottom: 5, textTransform: "uppercase", letterSpacing: .5 }}>Nº Casa <span style={{ color: C.red }}>*</span></label>
-            <input value={num} onChange={e => { setNum(e.target.value); setErros(p => ({ ...p, num: undefined })); }} placeholder="01"
-              style={{ width: "100%", background: C.bg, border: `1.5px solid ${erros.num ? C.red : C.border2}`, borderRadius: 11, padding: "11px 13px", color: C.text, fontSize: 14, outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
+            <label style={LB}>Nº Casa <span style={{ color: C.red }}>*</span></label>
+            <input
+              value={num}
+              onChange={e => { const v = e.target.value.replace(/\D/g, "").slice(0, 3); setNum(v); setErros(p => ({ ...p, num: undefined })); }}
+              placeholder="01"
+              maxLength={3}
+              inputMode="numeric"
+              style={IS(erros.num)}
+            />
             {erros.num && <div style={{ color: C.red, fontSize: 11, marginTop: 3 }}>⚠ {erros.num}</div>}
+            {!erros.num && <div style={{ color: C.muted, fontSize: 10, marginTop: 3 }}>Máx 3 dígitos</div>}
           </div>
         </div>
 
         {quadra && num && (
           <div style={{ background: `${C.accent}10`, border: `1px solid ${C.accent}28`, borderRadius: 10, padding: "9px 13px", marginTop: 14, color: C.accent, fontSize: 13, fontWeight: 600 }}>
-            🏠 ID: <strong>{up(quadra)}-{up(num)}</strong>
+            🏠 ID: <strong>{quadra}-{num}</strong>
           </div>
         )}
       </Crd>
@@ -1004,7 +1111,7 @@ const gerarRecibo = (pag, morador) => {
   <div class="body">
     <div class="valor-destaque">${R(pag.valor)}</div>
     <div class="row"><span class="label">Morador</span><span class="value">${nome}</span></div>
-    <div class="row"><span class="label">Quadra / Casa</span><span class="value">${quadra} / ${casa}</span></div>
+    <div class="row"><span class="label">Quadra / Casa</span><span class="value">${quadra} - ${casa}</span></div>
     <div class="row"><span class="label">Mês de referência</span><span class="value">${cap(fmtMes(pag.mes))}</span></div>
     <div class="row"><span class="label">Data do pagamento</span><span class="value">${fmtData(pag.data_pagamento)}</span></div>
     <div class="row"><span class="label">Forma de pagamento</span><span class="value">${cap(pag.forma_pagamento)}</span></div>
@@ -1028,7 +1135,6 @@ const gerarRecibo = (pag, morador) => {
 // EXPORTAÇÕES — PDF e Excel
 // ============================================================
 const exportarPDF = async (moradores, pagamentos, financeiro, filtros, titulo) => {
-  // Carregar jsPDF dinamicamente
   if (!window.jspdf) {
     await new Promise((res, rej) => {
       const s = document.createElement("script");
@@ -1043,22 +1149,21 @@ const exportarPDF = async (moradores, pagamentos, financeiro, filtros, titulo) =
   let y = 20;
 
   const addLine = (text, x, yy, size=10, bold=false, color=[0,0,0]) => {
-    doc.setFontSize(size);
-    doc.setFont("helvetica", bold ? "bold" : "normal");
-    doc.setTextColor(...color);
-    doc.text(text, x, yy);
+    doc.setFontSize(size); doc.setFont("helvetica", bold ? "bold" : "normal"); doc.setTextColor(...color); doc.text(text, x, yy);
   };
-
   const checkPage = () => { if (y > 270) { doc.addPage(); y = 20; } };
 
+  // Determinar mês de referência para o relatório
+  const mesRef = filtros.mes ? isoParaMes(filtros.mes) : getMesNow();
+  const mesLabel = cap(fmtMes(mesRef));
+
   // Header
-  doc.setFillColor(30, 41, 59);
-  doc.rect(0, 0, pw, 28, "F");
-  addLine("Condomínio Boa Esperança", pw/2, 12, 16, true, [255,255,255]);
+  doc.setFillColor(30, 41, 59); doc.rect(0, 0, pw, 30, "F");
+  addLine("Condomínio Boa Esperança", pw/2, 11, 15, true, [255,255,255]);
   doc.setFontSize(9); doc.setTextColor(180,200,220);
-  doc.text(titulo, pw/2, 20, { align: "center" });
-  doc.text(`Gerado em ${new Date().toLocaleDateString("pt-BR")}`, pw/2, 25, { align: "center" });
-  y = 38;
+  doc.text(titulo, pw/2, 18, { align:"center" });
+  doc.text(`Período: ${mesLabel}   |   Gerado em ${new Date().toLocaleDateString("pt-BR")}`, pw/2, 24, { align:"center" });
+  y = 40;
 
   // ─── Bloco Financeiro ─────────────────────────────────────
   addLine("RESUMO FINANCEIRO", 14, y, 11, true, [59,130,246]); y += 7;
@@ -1066,12 +1171,13 @@ const exportarPDF = async (moradores, pagamentos, financeiro, filtros, titulo) =
 
   const allItems = [
     ...pagamentos.map(p => {
-      const m = moradores.find(x=>x.casa_id===p.casa_id);
-      return { tipo:"entrada", descricao:`Mensalidade — ${m?cap(m.nome):p.casa_id}`, valor:p.valor, data:p.data_pagamento?.split("T")[0]||"" };
+      const m = moradores.find(x => x.casa_id === p.casa_id);
+      return { tipo:"entrada", descricao:`Mensalidade — ${m ? cap(m.nome) : p.casa_id}`, valor:p.valor, data:p.data_pagamento?.split("T")[0]||"", mes:p.mes };
     }),
     ...financeiro.map(f => ({ ...f })),
   ].filter(i => {
     const d = new Date((i.data||"")+"T12:00:00");
+    // Filtro por mês selecionado
     if (filtros.mes) { const [y2,m2]=filtros.mes.split("-"); if(d.getFullYear()!==+y2||d.getMonth()+1!==+m2) return false; }
     if (filtros.dataInicio && d<new Date(filtros.dataInicio+"T00:00:00")) return false;
     if (filtros.dataFim    && d>new Date(filtros.dataFim+"T23:59:59"))    return false;
@@ -1084,51 +1190,52 @@ const exportarPDF = async (moradores, pagamentos, financeiro, filtros, titulo) =
   addLine(`Saldo:     ${R(tot.entrada-tot.saida)}`, 14, y, 10, true, tot.entrada-tot.saida>=0?[59,130,246]:[239,68,68]); y += 10;
 
   // Tabela lançamentos
-  addLine("LANÇAMENTOS", 14, y, 10, true, [100,116,139]); y += 6;
+  addLine("LANÇAMENTOS DO PERÍODO", 14, y, 10, true, [100,116,139]); y += 6;
   const cols = [14, 50, 130, 158];
-  const hRow = (yy) => { doc.setFillColor(22,34,54); doc.rect(14, yy-5, pw-28, 7, "F"); };
-  hRow(y);
-  addLine("Data",     cols[0], y, 8, true, [200,220,240]);
-  addLine("Descrição",cols[1], y, 8, true, [200,220,240]);
-  addLine("Tipo",     cols[2], y, 8, true, [200,220,240]);
-  addLine("Valor",    cols[3], y, 8, true, [200,220,240]);
+  doc.setFillColor(22,34,54); doc.rect(14, y-5, pw-28, 7, "F");
+  addLine("Data", cols[0], y, 8, true, [200,220,240]);
+  addLine("Descrição", cols[1], y, 8, true, [200,220,240]);
+  addLine("Tipo", cols[2], y, 8, true, [200,220,240]);
+  addLine("Valor", cols[3], y, 8, true, [200,220,240]);
   y += 6;
 
-  allItems.sort((a,b)=>new Date(b.data)-new Date(a.data)).forEach((item,i) => {
+  allItems.sort((a,b)=>new Date(b.data)-new Date(a.data)).forEach((item,i)=>{
     checkPage();
-    if (i%2===0) { doc.setFillColor(245,248,252); doc.rect(14, y-4, pw-28, 6, "F"); }
-    addLine(fmtData(item.data),                    cols[0], y, 8);
-    addLine(item.descricao.slice(0,40),             cols[1], y, 8);
-    addLine(item.tipo==="entrada"?"Entrada":"Saída",cols[2], y, 8, false, item.tipo==="entrada"?[16,185,129]:[239,68,68]);
+    if(i%2===0){ doc.setFillColor(245,248,252); doc.rect(14,y-4,pw-28,6,"F"); }
+    addLine(fmtData(item.data), cols[0], y, 8);
+    addLine(item.descricao.slice(0,40), cols[1], y, 8);
+    addLine(item.tipo==="entrada"?"Entrada":"Saída", cols[2], y, 8, false, item.tipo==="entrada"?[16,185,129]:[239,68,68]);
     addLine((item.tipo==="saida"?"-":"+")+R(item.valor), cols[3], y, 8, false, item.tipo==="entrada"?[16,185,129]:[239,68,68]);
     y += 6;
   });
 
   y += 8; checkPage();
 
-  // ─── Bloco Moradores por Quadra ───────────────────────────
-  addLine("RELATÓRIO POR QUADRA", 14, y, 11, true, [59,130,246]); y += 7;
+  // ─── Bloco Moradores por Quadra — usando mesRef do filtro ──
+  addLine(`STATUS POR QUADRA — ${mesLabel.toUpperCase()}`, 14, y, 11, true, [59,130,246]); y += 7;
   doc.setDrawColor(59,130,246); doc.line(14, y, pw-14, y); y += 6;
 
-  const mesRef = getMesNow();
   const quadras = [...new Set(moradores.map(m=>m.quadra))].sort();
   quadras.forEach(q => {
     checkPage();
     addLine(`Quadra ${q}`, 14, y, 10, true, [148,163,184]); y += 6;
-    moradores.filter(m=>m.quadra===q).sort((a,b)=>a.numero_casa.localeCompare(b.numero_casa,"pt-BR",{numeric:true})).forEach(m => {
-      checkPage();
-      const st = getStatus(m.casa_id, mesRef, pagamentos);
-      addLine(`Casa ${m.numero_casa}  ${cap(m.nome)}`, 18, y, 9);
-      addLine(st==="pago"?"✓ Adimplente":"✗ Inadimplente", 150, y, 9, true, st==="pago"?[16,185,129]:[239,68,68]);
-      y += 6;
-    });
+    moradores.filter(m=>m.quadra===q)
+      .sort((a,b)=>a.numero_casa.localeCompare(b.numero_casa,"pt-BR",{numeric:true}))
+      .forEach(m => {
+        checkPage();
+        // Status calculado com o mês do filtro — nunca fixo
+        const st = getStatus(m.casa_id, mesRef, pagamentos);
+        addLine(`Casa ${m.numero_casa}  ${cap(m.nome)}`, 18, y, 9);
+        addLine(st==="pago"?"✓ Adimplente":"✗ Inadimplente", 148, y, 9, true, st==="pago"?[16,185,129]:[239,68,68]);
+        y += 6;
+      });
     y += 2;
   });
 
-  doc.save(`relatorio-condominio-${new Date().toISOString().slice(0,10)}.pdf`);
+  doc.save(`relatorio-${mesRef.split("-").reverse().join("-")}.pdf`);
 };
 
-const exportarExcel = async (moradores, pagamentos, financeiro) => {
+const exportarExcel = async (moradores, pagamentos, financeiro, filtros) => {
   if (!window.XLSX) {
     await new Promise((res, rej) => {
       const s = document.createElement("script");
@@ -1140,35 +1247,58 @@ const exportarExcel = async (moradores, pagamentos, financeiro) => {
   const XLSX = window.XLSX;
   const wb = XLSX.utils.book_new();
 
-  // Aba 1: Financeiro
+  // Mês de referência do filtro
+  const mesRef  = filtros.mes ? isoParaMes(filtros.mes) : getMesNow();
+  const mesISO  = filtros.mes || mesParaISO(getMesNow());
+
+  // Filtro de lançamentos pelo mês
+  const finFiltrado = financeiro.filter(f => {
+    if (!filtros.mes) return true;
+    const d = new Date(f.data+"T12:00:00");
+    const [y2,m2] = filtros.mes.split("-");
+    return d.getFullYear()===+y2 && d.getMonth()+1===+m2;
+  });
+
+  const pagFiltrado = pagamentos.filter(p => {
+    if (!filtros.mes) return true;
+    return p.mes === mesRef;
+  });
+
+  // Aba 1: Financeiro do período
   const rowsFin = [
+    [`Financeiro — ${cap(fmtMes(mesRef))}`],
     ["Data","Tipo","Descrição","Categoria","Valor (R$)"],
-    ...financeiro.map(f=>[fmtData(f.data), f.tipo==="entrada"?"Entrada":"Saída", f.descricao, f.categoria||"", f.valor]),
+    ...finFiltrado.map(f=>[fmtData(f.data), f.tipo==="entrada"?"Entrada":"Saída", f.descricao, f.categoria||"", f.valor]),
   ];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rowsFin), "Financeiro");
 
-  // Aba 2: Mensalidades
+  // Aba 2: Mensalidades do período
   const rowsPag = [
+    [`Mensalidades — ${cap(fmtMes(mesRef))}`],
     ["Casa","Morador","Mês","Valor","Data Pagamento","Forma"],
-    ...pagamentos.map(p=>{
+    ...pagFiltrado.map(p=>{
       const m = moradores.find(x=>x.casa_id===p.casa_id);
       return [p.casa_id, m?cap(m.nome):"—", fmtMes(p.mes), p.valor, fmtData(p.data_pagamento), cap(p.forma_pagamento)];
     }),
   ];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rowsPag), "Mensalidades");
 
-  // Aba 3: Status por morador
-  const mesRef = getMesNow();
+  // Aba 3: Status por morador — baseado no mesRef do filtro (dinâmico, nunca salvo)
   const rowsMor = [
-    ["Casa","Quadra","Nº","Nome","Telefone","Status " + cap(fmtMes(mesRef))],
+    [`Status dos Moradores — ${cap(fmtMes(mesRef))}`],
+    ["Casa","Quadra","Nº","Nome","Telefone",`Status ${cap(fmtMes(mesRef))}`],
     ...moradores.sort((a,b)=>a.nome.localeCompare(b.nome,"pt-BR")).map(m=>[
       m.casa_id, m.quadra, m.numero_casa, cap(m.nome), m.telefone,
-      getStatus(m.casa_id, mesRef, pagamentos)==="pago"?"Adimplente":"Inadimplente",
+      // Status calculado dinamicamente pelo mês do filtro
+      getStatus(m.casa_id, mesRef, pagamentos)==="pago" ? "Adimplente" : "Inadimplente",
     ]),
   ];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rowsMor), "Moradores");
 
-  XLSX.writeFile(wb, `condominio-boa-esperanca-${new Date().toISOString().slice(0,10)}.xlsx`);
+  const nomeArq = filtros.mes
+    ? `condominio-${filtros.mes}.xlsx`
+    : `condominio-${new Date().toISOString().slice(0,10)}.xlsx`;
+  XLSX.writeFile(wb, nomeArq);
 };
 
 // ============================================================
@@ -1214,7 +1344,7 @@ const Relatorios = ({ moradores, pagamentos, financeiro }) => {
 
   const handleExcel = async () => {
     setExportando(true);
-    try { await exportarExcel(moradores, pagamentos, financeiro); }
+    try { await exportarExcel(moradores, pagamentos, financeiro, filtros); }
     catch { alert("Erro ao gerar Excel"); }
     finally { setExportando(false); }
   };
@@ -1339,7 +1469,8 @@ const Relatorios = ({ moradores, pagamentos, financeiro }) => {
 
           {/* Resumo */}
           {(() => {
-            const adim = moradores.filter(m=>getStatus(m.casa_id,mesQuadra,pagamentos)==="pago").length;
+            // Status calculado com o mês selecionado na navegação — não o mês atual
+            const adim = moradores.filter(m=>getStatus(m.casa_id, mesQuadra, pagamentos)==="pago").length;
             const inad = moradores.length - adim;
             return (
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:9, marginBottom:14 }}>
@@ -1366,7 +1497,7 @@ const Relatorios = ({ moradores, pagamentos, financeiro }) => {
                 </div>
                 <Crd sx={{ padding:0, overflow:"hidden" }}>
                   {daCasa.map((m,i)=>{
-                    const st = getStatus(m.casa_id, mesQuadra, pagamentos);
+                    const st = getStatus(m.casa_id, mesQuadra, pagamentos); // usa o mês selecionado
                     return (
                       <div key={m.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"11px 14px", background:i%2===0?C.card:C.card2, borderBottom:i<daCasa.length-1?`1px solid ${C.border}`:"none" }}>
                         <div style={{ width:34, height:34, borderRadius:9, background:st==="pago"?`${C.green}15`:`${C.yellow}15`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, flexShrink:0 }}>
@@ -1443,10 +1574,11 @@ const Relatorios = ({ moradores, pagamentos, financeiro }) => {
           </Crd>
 
           <Crd>
-            <div style={{ color:C.text, fontWeight:700, fontSize:13, marginBottom:12 }}>🏘️ Status — {cap(fmtMes(getMesNow()))}</div>
+            <div style={{ color:C.text, fontWeight:700, fontSize:13, marginBottom:12 }}>🏘️ Status — {cap(fmtMes(mesQuadra))}</div>
             {quadras.map(q=>{
               const daCasa = moradores.filter(m=>m.quadra===q);
-              const adim   = daCasa.filter(m=>getStatus(m.casa_id,getMesNow(),pagamentos)==="pago").length;
+              // Status calculado com o mês da aba Por Quadra — dinâmico
+              const adim   = daCasa.filter(m=>getStatus(m.casa_id, mesQuadra, pagamentos)==="pago").length;
               return (
                 <div key={q} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 0", borderBottom:`1px solid ${C.border}` }}>
                   <span style={{ color:C.sub, fontSize:12 }}>Quadra {q} ({daCasa.length} casas)</span>
