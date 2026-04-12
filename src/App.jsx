@@ -17,17 +17,17 @@ const sb = async (path, opts = {}) => {
 };
 
 const api = {
-  getMoradores:    ()      => sb("moradores?order=casa_id.asc"),
-  addMorador:      (d)     => sb("moradores", { method: "POST", body: JSON.stringify(d) }),
-  updateMorador:   (id, d) => sb(`moradores?id=eq.${id}`, { method: "PATCH", body: JSON.stringify(d) }),
-  deleteMorador:   (id)    => sb(`moradores?id=eq.${id}`, { method: "DELETE", prefer: "return=minimal" }),
-  getPagamentos:   ()      => sb("pagamentos?order=created_at.desc"),
-  addPagamento:    (d)     => sb("pagamentos", { method: "POST", body: JSON.stringify(d) }),
-  deletePagamento: (id)    => sb(`pagamentos?id=eq.${id}`, { method: "DELETE", prefer: "return=minimal" }),
-  getFinanceiro:    ()      => sb("financeiro?order=data.desc"),
-  addFinanceiro:    (d)    => sb("financeiro", { method: "POST", body: JSON.stringify(d) }),
-  updateFinanceiro: (id,d) => sb(`financeiro?id=eq.${id}`, { method: "PATCH", body: JSON.stringify(d) }),
-  deleteFinanceiro: (id)   => sb(`financeiro?id=eq.${id}`, { method: "DELETE", prefer: "return=minimal" }),
+  getMoradores: () => sb("moradores?order=casa_id.asc"),
+  addMorador: (d) => sb("moradores", { method: "POST", body: JSON.stringify(d) }),
+  updateMorador: (id, d) => sb(`moradores?id=eq.${id}`, { method: "PATCH", body: JSON.stringify(d) }),
+  deleteMorador: (id) => sb(`moradores?id=eq.${id}`, { method: "DELETE", prefer: "return=minimal" }),
+  getPagamentos: () => sb("pagamentos?order=created_at.desc"),
+  addPagamento: (d) => sb("pagamentos", { method: "POST", body: JSON.stringify(d) }),
+  deletePagamento: (id) => sb(`pagamentos?id=eq.${id}`, { method: "DELETE", prefer: "return=minimal" }),
+  getFinanceiro: () => sb("financeiro?order=data.desc"),
+  addFinanceiro: (d) => sb("financeiro", { method: "POST", body: JSON.stringify(d) }),
+  updateFinanceiro: (id, d) => sb(`financeiro?id=eq.${id}`, { method: "PATCH", body: JSON.stringify(d) }),
+  deleteFinanceiro: (id) => sb(`financeiro?id=eq.${id}`, { method: "DELETE", prefer: "return=minimal" }),
 };
 
 // ============================================================
@@ -42,37 +42,46 @@ const C = {
 };
 
 const STATUS = {
-  pago:     { bg: C.green,  dim: "#10b98120", border: "#10b98140", label: "Pago",     emoji: "✅" },
+  pago: { bg: C.green, dim: "#10b98120", border: "#10b98140", label: "Pago", emoji: "✅" },
   pendente: { bg: C.yellow, dim: "#f59e0b20", border: "#f59e0b40", label: "Pendente", emoji: "⏳" },
 };
 
-const FORMAS     = ["pix", "dinheiro", "debito", "credito"];
+const FORMAS = ["pix", "dinheiro", "debito", "credito"];
 const CATEGORIAS = ["fixo", "variavel", "emergencial", "outro"];
 
 // ============================================================
 // HELPERS
 // ============================================================
-const R       = (v) => (v ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const R = (v) => (v ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmtData = (s) => s ? new Date(s + (s.includes("T") ? "" : "T12:00:00")).toLocaleDateString("pt-BR") : "-";
-const cap     = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s;
-const up      = (s) => s ? s.trim().toUpperCase() : s;
+const cap = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s;
+const up = (s) => s ? s.trim().toUpperCase() : s;
 
 // Formato interno do mês: "MM-YYYY" (ex: "04-2026")
-const buildMes    = (d) => { const x = new Date(d); return `${String(x.getMonth() + 1).padStart(2, "0")}-${x.getFullYear()}`; };
-const getMesNow   = () => buildMes(new Date());
-const parseMes    = (m) => { const [mm, yy] = m.split("-"); return new Date(+yy, +mm - 1, 1); };
-const navMes      = (m, d) => { const x = parseMes(m); x.setMonth(x.getMonth() + d); return buildMes(x); };
-const fmtMes      = (m) => { const [mm, yy] = m.split("-"); return new Date(+yy, +mm - 1, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" }); };
+const buildMes = (d) => { const x = new Date(d); return `${String(x.getMonth() + 1).padStart(2, "0")}-${x.getFullYear()}`; };
+const getMesNow = () => buildMes(new Date());
+const parseMes = (m) => { const [mm, yy] = m.split("-"); return new Date(+yy, +mm - 1, 1); };
+const navMes = (m, d) => { const x = parseMes(m); x.setMonth(x.getMonth() + d); return buildMes(x); };
+const fmtMes = (m) => { const [mm, yy] = m.split("-"); return new Date(+yy, +mm - 1, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" }); };
 const fmtMesCurto = (m) => { const [mm, yy] = m.split("-"); return new Date(+yy, +mm - 1, 1).toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }); };
 
 // Converte "MM-YYYY" → "YYYY-MM" para uso em input type="month" e filtros ISO
-const mesParaISO  = (m) => { const [mm, yy] = m.split("-"); return `${yy}-${mm}`; };
+const mesParaISO = (m) => { const [mm, yy] = m.split("-"); return `${yy}-${mm}`; };
 // Converte "YYYY-MM" → "MM-YYYY"
-const isoParaMes  = (iso) => { const [yy, mm] = iso.split("-"); return `${mm}-${yy}`; };
+const isoParaMes = (iso) => { const [yy, mm] = iso.split("-"); return `${mm}-${yy}`; };
 
 // Status calculado SEMPRE dinamicamente pelo mês informado — nunca salvo no banco
+// Aceita casaId (legado) ou moradorId como identificador
 const getStatus = (casaId, mes, pagamentos) =>
   pagamentos.some(p => p.casa_id === casaId && p.mes === (mes || getMesNow())) ? "pago" : "pendente";
+
+// Imprime relatório HTML em nova aba
+const imprimirRelatorio = (htmlContent) => {
+  const w = window.open("", "_blank");
+  w.document.write(htmlContent);
+  w.document.close();
+  setTimeout(() => w.print(), 500);
+};
 
 // ============================================================
 // VALIDAÇÕES
@@ -106,21 +115,7 @@ const maskCPF = (v) => {
 const waLink = (tel, nome, mes) => {
   const n = tel.replace(/\D/g, "");
   const fone = n.startsWith("55") ? n : `55${n}`;
-  const msg = encodeURIComponent(`Olá Sr. ${cap(nome)}, tudo bem?
-
-A mensalidade de ${cap(fmtMes(mes))} do Condomínio Boa Esperança está em aberto.
-
-Sua contribuição é essencial para manter a organização e o bem-estar de todos.
-
-Pagamento via PIX:
-🔑 91980630277
-👤 MARCO A. M. DE SOUZA 
-🏦 NUBANK
-
-Contamos com sua regularização.
-
-Atenciosamente,
-Administração 🏘️`);
+  const msg = encodeURIComponent(`Olá ${cap(nome)}, sua mensalidade de ${cap(fmtMes(mes))} está pendente. Por favor, regularize o pagamento. Obrigado! 🏘️`);
   return `https://wa.me/${fone}?text=${msg}`;
 };
 
@@ -136,10 +131,10 @@ const SI = () => (
 // Botão
 const Btn = ({ children, onClick, v = "primary", sz = "md", loading = false, disabled = false, full = false, sx = {} }) => {
   const VS = {
-    primary:  { background: `linear-gradient(135deg,${C.accent},${C.accentD})`, color: "#fff", border: "none" },
-    success:  { background: `linear-gradient(135deg,${C.green},#059669)`, color: "#fff", border: "none" },
-    danger:   { background: `${C.red}18`, color: "#f87171", border: `1px solid ${C.red}33` },
-    ghost:    { background: "transparent", color: C.sub, border: `1px solid ${C.border2}` },
+    primary: { background: `linear-gradient(135deg,${C.accent},${C.accentD})`, color: "#fff", border: "none" },
+    success: { background: `linear-gradient(135deg,${C.green},#059669)`, color: "#fff", border: "none" },
+    danger: { background: `${C.red}18`, color: "#f87171", border: `1px solid ${C.red}33` },
+    ghost: { background: "transparent", color: C.sub, border: `1px solid ${C.border2}` },
     whatsapp: { background: "linear-gradient(135deg,#25d366,#128c7e)", color: "#fff", border: "none" },
   };
   const SZ = {
@@ -166,7 +161,7 @@ const Inp = ({ label, value, onChange, placeholder, type = "text", err, required
       onFocus={e => { if (!err) e.target.style.borderColor = C.accent; }}
       onBlur={e => { if (!err) e.target.style.borderColor = C.border2; }}
       {...rest} />
-    {err  && <div style={{ color: C.red,   fontSize: 11, marginTop: 4 }}>⚠ {err}</div>}
+    {err && <div style={{ color: C.red, fontSize: 11, marginTop: 4 }}>⚠ {err}</div>}
     {hint && !err && <div style={{ color: C.muted, fontSize: 11, marginTop: 4 }}>{hint}</div>}
   </div>
 );
@@ -189,24 +184,24 @@ const SBadge = ({ status, lg = false }) => {
 // Ícones
 const Ic = ({ n, sz = 20, c = "currentColor" }) => {
   const P = {
-    home:  "M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z",
-    bldg:  "M1 21h22M5 21V7l7-4 7 4v14M9 21v-4h6v4",
-    plus:  "M12 5v14M5 12h14",
-    wlt:   "M21 12V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5M16 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
-    chrt:  "M18 20V10M12 20V4M6 20v-6",
-    al:    "M15 18l-6-6 6-6",
-    ar:    "M9 18l6-6-6-6",
-    aup:   "M12 19V5M5 12l7-7 7 7",
-    adn:   "M12 5v14M19 12l-7 7-7-7",
-    chk:   "M20 6L9 17l-5-5",
-    edt:   "M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z",
-    trs:   "M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2",
-    srch:  "M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z",
-    usr:   "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z",
-    flt:   "M22 3H2l8 9.46V19l4 2v-8.54L22 3z",
-    ph:    "M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.88 9.5a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.99 0h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6.08 6.08l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z",
-    dlr:   "M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6",
-    bll:   "M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0",
+    home: "M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z",
+    bldg: "M1 21h22M5 21V7l7-4 7 4v14M9 21v-4h6v4",
+    plus: "M12 5v14M5 12h14",
+    wlt: "M21 12V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5M16 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
+    chrt: "M18 20V10M12 20V4M6 20v-6",
+    al: "M15 18l-6-6 6-6",
+    ar: "M9 18l6-6-6-6",
+    aup: "M12 19V5M5 12l7-7 7 7",
+    adn: "M12 5v14M19 12l-7 7-7-7",
+    chk: "M20 6L9 17l-5-5",
+    edt: "M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z",
+    trs: "M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2",
+    srch: "M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z",
+    usr: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z",
+    flt: "M22 3H2l8 9.46V19l4 2v-8.54L22 3z",
+    ph: "M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.88 9.5a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.99 0h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6.08 6.08l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z",
+    dlr: "M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6",
+    bll: "M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0",
   };
   return (
     <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -247,7 +242,7 @@ const NavMes = ({ mes, setMes }) => (
   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: "10px 16px" }}>
     <button onClick={() => setMes(navMes(mes, -1))} style={{ background: "none", border: "none", color: C.accent, cursor: "pointer", padding: 4, display: "flex" }}><Ic n="al" sz={18} c={C.accent} /></button>
     <span style={{ color: C.text, fontWeight: 700, fontSize: 14 }}>📅 {cap(fmtMes(mes))}</span>
-    <button onClick={() => setMes(navMes(mes, 1))}  style={{ background: "none", border: "none", color: C.accent, cursor: "pointer", padding: 4, display: "flex" }}><Ic n="ar" sz={18} c={C.accent} /></button>
+    <button onClick={() => setMes(navMes(mes, 1))} style={{ background: "none", border: "none", color: C.accent, cursor: "pointer", padding: 4, display: "flex" }}><Ic n="ar" sz={18} c={C.accent} /></button>
   </div>
 );
 
@@ -257,10 +252,10 @@ const NavMes = ({ mes, setMes }) => (
 const BottomNav = ({ page, setPage }) => {
   const tabs = [
     { id: "dashboard", ic: "home", lb: "Início" },
-    { id: "casas",     ic: "bldg", lb: "Casas"  },
-    { id: "cadastro",  ic: "plus", lb: ""        },
-    { id: "financeiro",ic: "wlt",  lb: "Financ." },
-    { id: "relatorios",ic: "chrt", lb: "Relat."  },
+    { id: "casas", ic: "bldg", lb: "Casas" },
+    { id: "cadastro", ic: "plus", lb: "" },
+    { id: "financeiro", ic: "wlt", lb: "Financ." },
+    { id: "relatorios", ic: "chrt", lb: "Relat." },
   ];
   return (
     <nav style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 480, background: C.card, borderTop: `1px solid ${C.border}`, display: "flex", zIndex: 200, height: 62 }}>
@@ -269,13 +264,13 @@ const BottomNav = ({ page, setPage }) => {
           style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2, border: "none", background: "none", cursor: "pointer", color: page === t.id ? C.accent : C.muted, padding: 0, fontFamily: "inherit", position: "relative" }}>
           {t.id === "cadastro"
             ? <div style={{ width: 42, height: 42, borderRadius: "50%", background: `linear-gradient(135deg,${C.accent},${C.accentD})`, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 4px 14px ${C.accent}55`, marginTop: -10 }}>
-                <Ic n="plus" sz={20} c="#fff" />
-              </div>
+              <Ic n="plus" sz={20} c="#fff" />
+            </div>
             : <>
-                <Ic n={t.ic} sz={19} c={page === t.id ? C.accent : C.muted} />
-                <span style={{ fontSize: 9, fontWeight: page === t.id ? 700 : 400 }}>{t.lb}</span>
-                {page === t.id && <div style={{ position: "absolute", bottom: 0, width: 18, height: 2, background: C.accent, borderRadius: 2 }} />}
-              </>
+              <Ic n={t.ic} sz={19} c={page === t.id ? C.accent : C.muted} />
+              <span style={{ fontSize: 9, fontWeight: page === t.id ? 700 : 400 }}>{t.lb}</span>
+              {page === t.id && <div style={{ position: "absolute", bottom: 0, width: 18, height: 2, background: C.accent, borderRadius: 2 }} />}
+            </>
           }
         </button>
       ))}
@@ -314,22 +309,22 @@ const HouseCard = ({ morador, status, onClick, onWA }) => {
 // DASHBOARD
 // ============================================================
 const Dashboard = ({ moradores, pagamentos, financeiro }) => {
-  const mes         = getMesNow();
-  const inadimp     = moradores.filter(m => getStatus(m.casa_id, mes, pagamentos) !== "pago");
-  const pagos       = moradores.filter(m => getStatus(m.casa_id, mes, pagamentos) === "pago");
-  const recMes      = pagamentos.filter(p => p.mes === mes).reduce((a, p) => a + p.valor, 0);
-  const totalRec    = pagamentos.reduce((a, p) => a + p.valor, 0);
+  const mes = getMesNow();
+  const inadimp = moradores.filter(m => getStatus(m.casa_id, mes, pagamentos) !== "pago");
+  const pagos = moradores.filter(m => getStatus(m.casa_id, mes, pagamentos) === "pago");
+  const recMes = pagamentos.filter(p => p.mes === mes).reduce((a, p) => a + p.valor, 0);
+  const totalRec = pagamentos.reduce((a, p) => a + p.valor, 0);
   const totalEntradas = financeiro.filter(f => f.tipo === "entrada").reduce((a, f) => a + f.valor, 0);
   const totalSaidas = financeiro.filter(f => f.tipo === "saida").reduce((a, f) => a + f.valor, 0);
-  const saldo       = totalRec + totalEntradas - totalSaidas;
-  const pct         = moradores.length ? Math.round((pagos.length / moradores.length) * 100) : 0;
+  const saldo = totalRec + totalEntradas - totalSaidas;
+  const pct = moradores.length ? Math.round((pagos.length / moradores.length) * 100) : 0;
 
-  const ultimos6    = Array.from({ length: 6 }, (_, i) => navMes(mes, -(5 - i)));
-  const dataBarras  = ultimos6.map(m => ({
-    mes:      fmtMesCurto(m),
-    Pagos:    moradores.filter(mo => getStatus(mo.casa_id, m, pagamentos) === "pago").length,
-    Pendentes:moradores.filter(mo => getStatus(mo.casa_id, m, pagamentos) !== "pago").length,
-    Receita:  pagamentos.filter(p => p.mes === m).reduce((a, p) => a + p.valor, 0),
+  const ultimos6 = Array.from({ length: 6 }, (_, i) => navMes(mes, -(5 - i)));
+  const dataBarras = ultimos6.map(m => ({
+    mes: fmtMesCurto(m),
+    Pagos: moradores.filter(mo => getStatus(mo.casa_id, m, pagamentos) === "pago").length,
+    Pendentes: moradores.filter(mo => getStatus(mo.casa_id, m, pagamentos) !== "pago").length,
+    Receita: pagamentos.filter(p => p.mes === m).reduce((a, p) => a + p.valor, 0),
   }));
 
   return (
@@ -351,10 +346,10 @@ const Dashboard = ({ moradores, pagamentos, financeiro }) => {
       {/* KPI Cards */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
         {[
-          { lb: "Casas",         val: moradores.length,  color: C.accent,  ic: "bldg", sub: "cadastradas"     },
-          { lb: "Inadimplentes", val: inadimp.length,    color: C.red,     ic: "bll",  sub: "neste mês"        },
-          { lb: "Pagos",         val: `${pagos.length}`, color: C.green,   ic: "chk",  sub: `${pct}% do total` },
-          { lb: "Arrecadado",    val: R(recMes),         color: C.purple,  ic: "dlr",  sub: "em mensalidades"  },
+          { lb: "Casas", val: moradores.length, color: C.accent, ic: "bldg", sub: "cadastradas" },
+          { lb: "Inadimplentes", val: inadimp.length, color: C.red, ic: "bll", sub: "neste mês" },
+          { lb: "Pagos", val: `${pagos.length}`, color: C.green, ic: "chk", sub: `${pct}% do total` },
+          { lb: "Arrecadado", val: R(recMes), color: C.purple, ic: "dlr", sub: "em mensalidades" },
         ].map(c => (
           <Crd key={c.lb} sx={{ border: `1px solid ${c.color}20`, padding: "14px 16px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -405,7 +400,7 @@ const Dashboard = ({ moradores, pagamentos, financeiro }) => {
             <XAxis dataKey="mes" tick={{ fill: C.muted, fontSize: 10 }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fill: C.muted, fontSize: 9 }} axisLine={false} tickLine={false} />
             <Tooltip contentStyle={{ background: C.card2, border: `1px solid ${C.border2}`, borderRadius: 10, color: C.text, fontSize: 12 }} />
-            <Bar dataKey="Pagos"     fill={C.green}  radius={[4, 4, 0, 0]} />
+            <Bar dataKey="Pagos" fill={C.green} radius={[4, 4, 0, 0]} />
             <Bar dataKey="Pendentes" fill={C.yellow} radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
@@ -440,15 +435,15 @@ const Dashboard = ({ moradores, pagamentos, financeiro }) => {
 // CASAS
 // ============================================================
 const Casas = ({ moradores, pagamentos, setPage, setSelectedCasa }) => {
-  const [mes, setMes]             = useState(getMesNow());
-  const [busca, setBusca]         = useState("");
-  const [filtroSt, setFiltroSt]   = useState("todos");
+  const [mes, setMes] = useState(getMesNow());
+  const [busca, setBusca] = useState("");
+  const [filtroSt, setFiltroSt] = useState("todos");
 
-  const comSt   = moradores.map(m => ({ ...m, st: getStatus(m.casa_id, mes, pagamentos) })).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+  const comSt = moradores.map(m => ({ ...m, st: getStatus(m.casa_id, mes, pagamentos) })).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
   const buscados = comSt.filter(m => m.nome.toLowerCase().includes(busca.toLowerCase()) || m.casa_id.toLowerCase().includes(busca.toLowerCase()));
-  const counts  = { pago: 0, pendente: 0 };
+  const counts = { pago: 0, pendente: 0 };
   buscados.forEach(m => { if (counts[m.st] !== undefined) counts[m.st]++; });
-  const lista   = filtroSt === "todos" ? buscados : buscados.filter(m => m.st === filtroSt);
+  const lista = filtroSt === "todos" ? buscados : buscados.filter(m => m.st === filtroSt);
 
   return (
     <div style={{ padding: "20px 16px 88px" }}>
@@ -463,9 +458,9 @@ const Casas = ({ moradores, pagamentos, setPage, setSelectedCasa }) => {
 
       <div style={{ display: "flex", gap: 7, marginBottom: 14 }}>
         {[
-          { k: "todos",    lb: `Todos (${buscados.length})`,         c: C.accent  },
-          { k: "pago",     lb: `✅ Pagos (${counts.pago})`,          c: C.green   },
-          { k: "pendente", lb: `⏳ Pendentes (${counts.pendente})`,  c: C.yellow  },
+          { k: "todos", lb: `Todos (${buscados.length})`, c: C.accent },
+          { k: "pago", lb: `✅ Pagos (${counts.pago})`, c: C.green },
+          { k: "pendente", lb: `⏳ Pendentes (${counts.pendente})`, c: C.yellow },
         ].map(b => (
           <button key={b.k} onClick={() => setFiltroSt(b.k)}
             style={{ flex: 1, padding: "8px 4px", borderRadius: 10, border: `1.5px solid ${filtroSt === b.k ? b.c : C.border}`, background: filtroSt === b.k ? `${b.c}18` : "transparent", color: filtroSt === b.k ? b.c : C.muted, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
@@ -473,16 +468,100 @@ const Casas = ({ moradores, pagamentos, setPage, setSelectedCasa }) => {
           </button>
         ))}
       </div>
+      {/* Botão de Impressão Dinâmico */}
+      {filtroSt !== "todos" && lista.length > 0 && (
+        <button
+          onClick={() => {
+            const win = window.open("", "_blank");
+            win.document.write(`
+        <html>
+          <head>
+            <title>Relatório ${filtroSt === 'pago' ? 'Adimplentes' : 'Pendentes'}</title>
+            <style>
+              @media print { @page { margin: 1cm; } }
+              body { font-family: 'Inter', sans-serif; padding: 20px; color: #1a1a1a; }
+              .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 20px; }
+              h1 { font-size: 18px; margin: 0; color: ${filtroSt === 'pago' ? '#16a34a' : '#ca8a04'}; text-transform: uppercase; }
+              .info { font-size: 11px; color: #666; }
+              table { width: 100%; border-collapse: collapse; }
+              th { text-align: left; background: #f4f4f5; padding: 10px; font-size: 10px; text-transform: uppercase; color: #71717a; border: 1px solid #e4e4e7; }
+              td { padding: 10px; font-size: 12px; border: 1px solid #e4e4e7; color: #27272a; }
+              tr:nth-child(even) { background: #fafafa; }
+              .footer { margin-top: 20px; font-size: 9px; color: #a1a1aa; text-align: center; }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <div>
+                <h1>${filtroSt === 'pago' ? '✅ Relatório de Adimplentes' : '⏳ Relatório de Pendentes'}</h1>
+                <div class="info">Condomínio Boa Esperança • Referência: ${mes}</div>
+              </div>
+              <div style="text-align: right" class="info">
+                Gerado em: ${new Date().toLocaleDateString('pt-BR')}<br>
+                Total: ${lista.length} casas
+              </div>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Morador</th>
+                  <th>Quadra</th>
+                  <th>Casa</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${lista.map(m => `
+                  <tr>
+                    <td style="font-weight: 600;">${m.nome.toUpperCase()}</td>
+                    <td>${m.quadra}</td>
+                    <td>${m.numero_casa}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+            <div class="footer">Documento gerado pelo Sistema de Gestão Boa Esperança</div>
+          </body>
+        </html>
+      `);
+            win.document.close();
+
+            // Pequeno delay para garantir que o CSS carregue antes de imprimir
+            setTimeout(() => {
+              win.print();
+              win.close();
+            }, 500);
+          }}
+          style={{
+            width: "100%",
+            marginTop: 10,
+            background: filtroSt === "pago" ? `${C.green}15` : `${C.yellow}15`,
+            border: `1.5px solid ${filtroSt === "pago" ? C.green : C.yellow}`,
+            borderRadius: 12,
+            padding: "10px",
+            color: filtroSt === "pago" ? C.green : C.yellow,
+            fontSize: 11,
+            fontWeight: 800,
+            cursor: "pointer",
+            fontFamily: "inherit",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8
+          }}
+        >
+          🖨️ IMPRIMIR LISTA ({lista.length})
+        </button>
+      )}
 
       {lista.length === 0
         ? <div style={{ textAlign: "center", color: C.muted, marginTop: 60 }}><div style={{ fontSize: 40, marginBottom: 10 }}>🏘️</div>Nenhuma casa encontrada</div>
         : <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-            {lista.map(m => (
-              <HouseCard key={m.id} morador={m} status={m.st}
-                onClick={() => { setSelectedCasa(m); setPage("casa_detalhe"); }}
-                onWA={() => window.open(waLink(m.telefone, m.nome, mes), "_blank")} />
-            ))}
-          </div>
+          {lista.map(m => (
+            <HouseCard key={m.id} morador={m} status={m.st}
+              onClick={() => { setSelectedCasa(m); setPage("casa_detalhe"); }}
+              onWA={() => window.open(waLink(m.telefone, m.nome, mes), "_blank")} />
+          ))}
+        </div>
       }
     </div>
   );
@@ -506,25 +585,25 @@ const EditField = ({ lb, value, onChange, type = "text", maxLength, inputMode })
 );
 
 const CasaDetalhe = ({ casa, pagamentos, setPage, toast, reload }) => {
-  const [edit,   setEdit]   = useState(false);
-  const [edNome, setEdNome] = useState(casa.nome       || "");
-  const [edTel,  setEdTel]  = useState(casa.telefone   || "");
-  const [edCpf,  setEdCpf]  = useState(casa.cpf        || "");
-  const [edQuad, setEdQuad] = useState(casa.quadra     || "");
-  const [edNum,  setEdNum]  = useState(casa.numero_casa|| "");
-  const [modal,  setModal]  = useState(false);
+  const [edit, setEdit] = useState(false);
+  const [edNome, setEdNome] = useState(casa.nome || "");
+  const [edTel, setEdTel] = useState(casa.telefone || "");
+  const [edCpf, setEdCpf] = useState(casa.cpf || "");
+  const [edQuad, setEdQuad] = useState(casa.quadra || "");
+  const [edNum, setEdNum] = useState(casa.numero_casa || "");
+  const [modal, setModal] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [pf,     setPf]     = useState({ valor: 0.00, forma: "pix", mes: getMesNow(), dt: new Date().toISOString().split("T")[0] });
+  const [pf, setPf] = useState({ valor: 0.0, forma: "pix", mes: getMesNow(), dt: new Date().toISOString().split("T")[0] });
 
-  const pags  = pagamentos.filter(p => p.casa_id === casa.casa_id).sort((a, b) => new Date(b.data_pagamento) - new Date(a.data_pagamento));
+  const pags = pagamentos.filter(p => p.casa_id === casa.casa_id).sort((a, b) => new Date(b.data_pagamento) - new Date(a.data_pagamento));
   const stNow = getStatus(casa.casa_id, null, pagamentos);
-  const s     = STATUS[stNow];
+  const s = STATUS[stNow];
 
   // Mensagem WA com dados do recibo
   const waRecibo = (pag) => {
-    const n    = tel.replace(/\D/g, "");
+    const n = tel.replace(/\D/g, "");
     const fone = n.startsWith("55") ? n : `55${n}`;
-    const txt  = encodeURIComponent(
+    const txt = encodeURIComponent(
       `🧾 *Recibo de Pagamento*\n` +
       `Condomínio Boa Esperança\n\n` +
       `Morador: ${cap(casa.nome)}\n` +
@@ -543,7 +622,7 @@ const CasaDetalhe = ({ casa, pagamentos, setPage, toast, reload }) => {
   const salvarEdit = async () => {
     if (!edNome.trim() || !edTel.trim() || !edQuad.trim() || !edNum.trim()) { toast("Preencha todos os campos obrigatórios", "error"); return; }
     if (!/^[A-Za-z]$/.test(edQuad.trim())) { toast("Quadra deve ser uma única letra (A-Z)", "error"); return; }
-    if (!/^\d{1,3}$/.test(edNum.trim()))   { toast("Número da casa deve ter até 3 dígitos", "error"); return; }
+    if (!/^\d{1,3}$/.test(edNum.trim())) { toast("Número da casa deve ter até 3 dígitos", "error"); return; }
     setSaving(true);
     try {
       const q = edQuad.trim().toUpperCase();
@@ -616,18 +695,18 @@ const CasaDetalhe = ({ casa, pagamentos, setPage, toast, reload }) => {
 
         {edit ? (
           <>
-            <EditField lb="Nome"     value={edNome} onChange={e => setEdNome(e.target.value.toUpperCase())} />
-            <EditField lb="Telefone" value={edTel}  onChange={e => setEdTel(maskTel(e.target.value))} />
-            <EditField lb="CPF"      value={edCpf}  onChange={e => setEdCpf(maskCPF(e.target.value))} />
+            <EditField lb="Nome" value={edNome} onChange={e => setEdNome(e.target.value.toUpperCase())} />
+            <EditField lb="Telefone" value={edTel} onChange={e => setEdTel(maskTel(e.target.value))} />
+            <EditField lb="CPF" value={edCpf} onChange={e => setEdCpf(maskCPF(e.target.value))} />
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <EditField lb="Quadra (1 letra)"
                 value={edQuad}
-                onChange={e => { const v = e.target.value.replace(/[^A-Za-z]/g,"").slice(0,1).toUpperCase(); setEdQuad(v); }}
+                onChange={e => { const v = e.target.value.replace(/[^A-Za-z]/g, "").slice(0, 1).toUpperCase(); setEdQuad(v); }}
                 maxLength={1}
               />
               <EditField lb="Nº Casa (máx 3 dígitos)"
                 value={edNum}
-                onChange={e => { const v = e.target.value.replace(/\D/g,"").slice(0,3); setEdNum(v); }}
+                onChange={e => { const v = e.target.value.replace(/\D/g, "").slice(0, 3); setEdNum(v); }}
                 inputMode="numeric"
                 maxLength={3}
               />
@@ -635,7 +714,7 @@ const CasaDetalhe = ({ casa, pagamentos, setPage, toast, reload }) => {
           </>
         ) : (
           <>
-            {[["Nome", casa.nome],["Telefone", casa.telefone],["CPF", casa.cpf],["Quadra", casa.quadra],["Nº Casa", casa.numero_casa]].map(([lb, val]) => (
+            {[["Nome", casa.nome], ["Telefone", casa.telefone], ["CPF", casa.cpf], ["Quadra", casa.quadra], ["Nº Casa", casa.numero_casa]].map(([lb, val]) => (
               <div key={lb} style={{ marginBottom: 12 }}>
                 <div style={{ color: C.muted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: .5, marginBottom: 4 }}>{lb}</div>
                 <div style={{ color: C.text, fontSize: 14, fontWeight: 600 }}>{val || "—"}</div>
@@ -733,23 +812,23 @@ const CasaDetalhe = ({ casa, pagamentos, setPage, toast, reload }) => {
 // CADASTRO
 // ============================================================
 const Cadastro = ({ toast, reload, setPage }) => {
-  const [nome,   setNome]   = useState("");
-  const [tel,    setTel]    = useState("");
-  const [cpf,    setCpf]    = useState("");
+  const [nome, setNome] = useState("");
+  const [tel, setTel] = useState("");
+  const [cpf, setCpf] = useState("");
   const [quadra, setQuadra] = useState("");
-  const [num,    setNum]    = useState("");
-  const [erros,  setErros]  = useState({});
+  const [num, setNum] = useState("");
+  const [erros, setErros] = useState({});
   const [saving, setSaving] = useState(false);
 
   const validar = () => {
     const e = {};
-    if (!nome.trim())  e.nome = "Nome é obrigatório";
-    if (!tel.trim())   e.tel  = "Telefone é obrigatório";
+    if (!nome.trim()) e.nome = "Nome é obrigatório";
+    if (!tel.trim()) e.tel = "Telefone é obrigatório";
     else if (!validarTel(tel)) e.tel = "Formato inválido. Ex: (91) 99999-9999";
     if (cpf && !validarCPF(cpf)) e.cpf = "CPF inválido";
-    if (!quadra.trim())              e.quadra = "Quadra obrigatória";
+    if (!quadra.trim()) e.quadra = "Quadra obrigatória";
     else if (!/^[A-Z]$/.test(quadra)) e.quadra = "Apenas 1 letra (ex: A)";
-    if (!num.trim())                 e.num = "Número obrigatório";
+    if (!num.trim()) e.num = "Número obrigatório";
     else if (!/^\d{1,3}$/.test(num)) e.num = "Apenas números, máx 3 dígitos";
     setErros(e);
     return Object.keys(e).length === 0;
@@ -830,66 +909,66 @@ const Cadastro = ({ toast, reload, setPage }) => {
 // ============================================================
 const ModalEditFinanceiro = ({ item, onSave, onClose, saving }) => {
   const [form, setForm] = useState({
-    tipo:      item.tipo,
+    tipo: item.tipo,
     descricao: item.descricao,
-    valor:     item.valor,
-    data:      item.data,
+    valor: item.valor,
+    data: item.data,
     categoria: item.categoria || "",
   });
 
-  const IS = { width:"100%", background:C.bg, border:`1.5px solid ${C.border2}`, borderRadius:11, padding:"10px 12px", color:C.text, fontSize:14, outline:"none", boxSizing:"border-box", fontFamily:"inherit" };
-  const LB = { color:C.sub, fontSize:11, fontWeight:700, display:"block", marginBottom:5, textTransform:"uppercase", letterSpacing:.5 };
+  const IS = { width: "100%", background: C.bg, border: `1.5px solid ${C.border2}`, borderRadius: 11, padding: "10px 12px", color: C.text, fontSize: 14, outline: "none", boxSizing: "border-box", fontFamily: "inherit" };
+  const LB = { color: C.sub, fontSize: 11, fontWeight: 700, display: "block", marginBottom: 5, textTransform: "uppercase", letterSpacing: .5 };
 
   return (
-    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.82)", display:"flex", alignItems:"flex-end", zIndex:400 }} onClick={onClose}>
-      <div style={{ background:C.card, border:`1px solid ${C.border2}`, borderRadius:"22px 22px 0 0", padding:"24px 20px 32px", width:"100%", maxWidth:480, margin:"0 auto", boxSizing:"border-box" }} onClick={e=>e.stopPropagation()}>
-        <div style={{ width:36, height:4, background:C.border2, borderRadius:99, margin:"0 auto 18px" }}/>
-        <div style={{ color:C.text, fontWeight:800, fontSize:17, marginBottom:18 }}>✏️ Editar Lançamento</div>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.82)", display: "flex", alignItems: "flex-end", zIndex: 400 }} onClick={onClose}>
+      <div style={{ background: C.card, border: `1px solid ${C.border2}`, borderRadius: "22px 22px 0 0", padding: "24px 20px 32px", width: "100%", maxWidth: 480, margin: "0 auto", boxSizing: "border-box" }} onClick={e => e.stopPropagation()}>
+        <div style={{ width: 36, height: 4, background: C.border2, borderRadius: 99, margin: "0 auto 18px" }} />
+        <div style={{ color: C.text, fontWeight: 800, fontSize: 17, marginBottom: 18 }}>✏️ Editar Lançamento</div>
 
         {/* Tipo */}
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:14 }}>
-          {["entrada","saida"].map(t=>(
-            <button key={t} onClick={()=>setForm(p=>({...p,tipo:t}))}
-              style={{ padding:"10px", borderRadius:11, border:`1.5px solid ${form.tipo===t?(t==="entrada"?C.green:C.red):C.border2}`, background:form.tipo===t?(t==="entrada"?`${C.green}18`:`${C.red}18`):C.bg, color:form.tipo===t?(t==="entrada"?C.green:C.red):C.muted, fontWeight:700, fontSize:13, cursor:"pointer", fontFamily:"inherit" }}>
-              {t==="entrada"?"📈 Entrada":"📉 Saída"}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
+          {["entrada", "saida"].map(t => (
+            <button key={t} onClick={() => setForm(p => ({ ...p, tipo: t }))}
+              style={{ padding: "10px", borderRadius: 11, border: `1.5px solid ${form.tipo === t ? (t === "entrada" ? C.green : C.red) : C.border2}`, background: form.tipo === t ? (t === "entrada" ? `${C.green}18` : `${C.red}18`) : C.bg, color: form.tipo === t ? (t === "entrada" ? C.green : C.red) : C.muted, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+              {t === "entrada" ? "📈 Entrada" : "📉 Saída"}
             </button>
           ))}
         </div>
 
         {/* Descrição */}
-        <div style={{ marginBottom:12 }}>
+        <div style={{ marginBottom: 12 }}>
           <label style={LB}>Descrição</label>
-          <input value={form.descricao} onChange={e=>setForm(p=>({...p,descricao:e.target.value}))} style={IS}/>
+          <input value={form.descricao} onChange={e => setForm(p => ({ ...p, descricao: e.target.value }))} style={IS} />
         </div>
 
         {/* Valor + Data */}
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:9, marginBottom:12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 9, marginBottom: 12 }}>
           <div>
             <label style={LB}>Valor (R$)</label>
-            <input type="number" value={form.valor} min="0" step="0.01" onChange={e=>setForm(p=>({...p,valor:e.target.value}))} style={IS}/>
+            <input type="number" value={form.valor} min="0" step="0.01" onChange={e => setForm(p => ({ ...p, valor: e.target.value }))} style={IS} />
           </div>
           <div>
             <label style={LB}>Data</label>
-            <input type="date" value={form.data} onChange={e=>setForm(p=>({...p,data:e.target.value}))} style={IS}/>
+            <input type="date" value={form.data} onChange={e => setForm(p => ({ ...p, data: e.target.value }))} style={IS} />
           </div>
         </div>
 
         {/* Categoria */}
-        <div style={{ marginBottom:18 }}>
+        <div style={{ marginBottom: 18 }}>
           <label style={LB}>Categoria</label>
-          <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-            {["",...CATEGORIAS].map(c=>(
-              <button key={c} onClick={()=>setForm(p=>({...p,categoria:c}))}
-                style={{ padding:"5px 11px", borderRadius:7, border:`1px solid ${form.categoria===c?C.accent:C.border2}`, background:form.categoria===c?`${C.accent}18`:"transparent", color:form.categoria===c?C.accent:C.muted, fontSize:11, fontWeight:600, cursor:"pointer", fontFamily:"inherit" }}>
-                {c||"Nenhuma"}
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {["", ...CATEGORIAS].map(c => (
+              <button key={c} onClick={() => setForm(p => ({ ...p, categoria: c }))}
+                style={{ padding: "5px 11px", borderRadius: 7, border: `1px solid ${form.categoria === c ? C.accent : C.border2}`, background: form.categoria === c ? `${C.accent}18` : "transparent", color: form.categoria === c ? C.accent : C.muted, fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                {c || "Nenhuma"}
               </button>
             ))}
           </div>
         </div>
 
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:9 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 9 }}>
           <Btn v="ghost" full sz="md" onClick={onClose}>Cancelar</Btn>
-          <Btn v="primary" full sz="md" loading={saving} onClick={()=>onSave(form)}>Salvar</Btn>
+          <Btn v="primary" full sz="md" loading={saving} onClick={() => onSave(form)}>Salvar</Btn>
         </div>
       </div>
     </div>
@@ -900,18 +979,18 @@ const ModalEditFinanceiro = ({ item, onSave, onClose, saving }) => {
 // FINANCEIRO
 // ============================================================
 const Financeiro = ({ financeiro, toast, reload }) => {
-  const [form,     setForm]     = useState({ tipo: "entrada", descricao: "", valor: "", data: new Date().toISOString().split("T")[0], categoria: "" });
-  const [filtros,  setFiltros]  = useState({ tipo: "todos", mes: "", dataInicio: "", dataFim: "", categoria: "" });
+  const [form, setForm] = useState({ tipo: "entrada", descricao: "", valor: "", data: new Date().toISOString().split("T")[0], categoria: "" });
+  const [filtros, setFiltros] = useState({ tipo: "todos", mes: "", dataInicio: "", dataFim: "", categoria: "" });
   const [showForm, setShowForm] = useState(false);
-  const [saving,   setSaving]   = useState(false);
-  const [erros,    setErros]    = useState({});
+  const [saving, setSaving] = useState(false);
+  const [erros, setErros] = useState({});
   const [editItem, setEditItem] = useState(null); // item sendo editado
 
   const validar = () => {
     const e = {};
     if (!form.descricao.trim()) e.desc = "Descrição obrigatória";
     if (!form.valor || +form.valor <= 0) e.valor = "Valor deve ser > 0";
-    if (!form.data)  e.data = "Data obrigatória";
+    if (!form.data) e.data = "Data obrigatória";
     setErros(e); return Object.keys(e).length === 0;
   };
 
@@ -948,7 +1027,7 @@ const Financeiro = ({ financeiro, toast, reload }) => {
     const d = new Date(f.data + "T12:00:00");
     if (filtros.mes) { const [y, m] = filtros.mes.split("-"); if (d.getFullYear() !== +y || d.getMonth() + 1 !== +m) return false; }
     if (filtros.dataInicio && d < new Date(filtros.dataInicio + "T00:00:00")) return false;
-    if (filtros.dataFim    && d > new Date(filtros.dataFim + "T23:59:59"))    return false;
+    if (filtros.dataFim && d > new Date(filtros.dataFim + "T23:59:59")) return false;
     return true;
   }).sort((a, b) => new Date(b.data) - new Date(a.data));
 
@@ -959,7 +1038,7 @@ const Financeiro = ({ financeiro, toast, reload }) => {
 
   return (
     <div style={{ padding: "20px 16px 88px" }}>
-      {editItem && <ModalEditFinanceiro item={editItem} onSave={salvarEdicao} onClose={()=>setEditItem(null)} saving={saving}/>}
+      {editItem && <ModalEditFinanceiro item={editItem} onSave={salvarEdicao} onClose={() => setEditItem(null)} saving={saving} />}
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <h1 style={{ color: C.text, fontSize: 22, fontWeight: 900, margin: 0 }}>💰 Financeiro</h1>
@@ -971,9 +1050,9 @@ const Financeiro = ({ financeiro, toast, reload }) => {
       {/* Resumo */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 9, marginBottom: 14 }}>
         {[
-          { lb: "Entradas", val: tot.entrada, c: C.green  },
-          { lb: "Saídas",   val: tot.saida,   c: C.red    },
-          { lb: "Saldo",    val: tot.entrada - tot.saida, c: tot.entrada - tot.saida >= 0 ? C.accent : C.red },
+          { lb: "Entradas", val: tot.entrada, c: C.green },
+          { lb: "Saídas", val: tot.saida, c: C.red },
+          { lb: "Saldo", val: tot.entrada - tot.saida, c: tot.entrada - tot.saida >= 0 ? C.accent : C.red },
         ].map(x => (
           <Crd key={x.lb} sx={{ padding: "11px 10px", textAlign: "center", border: `1px solid ${x.c}20` }}>
             <div style={{ color: C.muted, fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: .5 }}>{x.lb}</div>
@@ -1049,26 +1128,26 @@ const Financeiro = ({ financeiro, toast, reload }) => {
       {filtrado.length === 0
         ? <div style={{ textAlign: "center", color: C.muted, marginTop: 40, fontSize: 13 }}>Nenhuma movimentação encontrada</div>
         : <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {filtrado.map(f => (
-              <div key={f.id} style={{ background: C.card, border: `1px solid ${f.tipo === "entrada" ? `${C.green}20` : `${C.red}20`}`, borderRadius: 14, padding: "13px 15px", display: "flex", alignItems: "center", gap: 11 }}>
-                <div style={{ width: 36, height: 36, borderRadius: 10, background: f.tipo === "entrada" ? `${C.green}15` : `${C.red}15`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, flexShrink: 0 }}>
-                  {f.tipo === "entrada" ? "📈" : "📉"}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ color: C.text, fontWeight: 600, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{f.descricao}</div>
-                  <div style={{ display: "flex", gap: 6, marginTop: 3, alignItems: "center" }}>
-                    <span style={{ color: C.muted, fontSize: 11 }}>{fmtData(f.data)}</span>
-                    {f.categoria && <span style={{ background: C.border2, color: C.sub, borderRadius: 4, padding: "1px 6px", fontSize: 9, fontWeight: 700 }}>{cap(f.categoria)}</span>}
-                  </div>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ color: f.tipo === "entrada" ? C.green : C.red, fontWeight: 800, fontSize: 13 }}>{f.tipo === "saida" ? "-" : "+"}{R(f.valor)}</span>
-                  <button onClick={() => setEditItem(f)} style={{ background: "none", border: "none", cursor: "pointer", padding: 3, display: "flex" }}><Ic n="edt" sz={13} c={C.accent} /></button>
-                  <button onClick={() => del(f.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 3, display: "flex" }}><Ic n="trs" sz={13} c={C.red} /></button>
+          {filtrado.map(f => (
+            <div key={f.id} style={{ background: C.card, border: `1px solid ${f.tipo === "entrada" ? `${C.green}20` : `${C.red}20`}`, borderRadius: 14, padding: "13px 15px", display: "flex", alignItems: "center", gap: 11 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: f.tipo === "entrada" ? `${C.green}15` : `${C.red}15`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, flexShrink: 0 }}>
+                {f.tipo === "entrada" ? "📈" : "📉"}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: C.text, fontWeight: 600, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{f.descricao}</div>
+                <div style={{ display: "flex", gap: 6, marginTop: 3, alignItems: "center" }}>
+                  <span style={{ color: C.muted, fontSize: 11 }}>{fmtData(f.data)}</span>
+                  {f.categoria && <span style={{ background: C.border2, color: C.sub, borderRadius: 4, padding: "1px 6px", fontSize: 9, fontWeight: 700 }}>{cap(f.categoria)}</span>}
                 </div>
               </div>
-            ))}
-          </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ color: f.tipo === "entrada" ? C.green : C.red, fontWeight: 800, fontSize: 13 }}>{f.tipo === "saida" ? "-" : "+"}{R(f.valor)}</span>
+                <button onClick={() => setEditItem(f)} style={{ background: "none", border: "none", cursor: "pointer", padding: 3, display: "flex" }}><Ic n="edt" sz={13} c={C.accent} /></button>
+                <button onClick={() => del(f.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 3, display: "flex" }}><Ic n="trs" sz={13} c={C.red} /></button>
+              </div>
+            </div>
+          ))}
+        </div>
       }
     </div>
   );
@@ -1078,9 +1157,9 @@ const Financeiro = ({ financeiro, toast, reload }) => {
 // RECIBO (abre nova aba com layout de impressão)
 // ============================================================
 const gerarRecibo = (pag, morador) => {
-  const nome  = morador ? cap(morador.nome) : "—";
-  const quadra= morador ? morador.quadra    : "—";
-  const casa  = morador ? morador.numero_casa:"—";
+  const nome = morador ? cap(morador.nome) : "—";
+  const quadra = morador ? morador.quadra : "—";
+  const casa = morador ? morador.numero_casa : "—";
   const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
 <title>Recibo — ${nome}</title>
 <style>
@@ -1111,7 +1190,7 @@ const gerarRecibo = (pag, morador) => {
   <div class="body">
     <div class="valor-destaque">${R(pag.valor)}</div>
     <div class="row"><span class="label">Morador</span><span class="value">${nome}</span></div>
-    <div class="row"><span class="label">Quadra / Casa</span><span class="value">${quadra} - ${casa}</span></div>
+    <div class="row"><span class="label">Quadra / Casa</span><span class="value">${quadra} / ${casa}</span></div>
     <div class="row"><span class="label">Mês de referência</span><span class="value">${cap(fmtMes(pag.mes))}</span></div>
     <div class="row"><span class="label">Data do pagamento</span><span class="value">${fmtData(pag.data_pagamento)}</span></div>
     <div class="row"><span class="label">Forma de pagamento</span><span class="value">${cap(pag.forma_pagamento)}</span></div>
@@ -1119,14 +1198,14 @@ const gerarRecibo = (pag, morador) => {
     <div class="assinatura">
       <p>_________________________________</p>
       <p style="margin-top:6px">Assinatura do Administrador</p>
-      <p style="margin-top:4px;font-size:10px">Gerado em ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}</p>
+      <p style="margin-top:4px;font-size:10px">Gerado em ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</p>
     </div>
   </div>
   <div class="footer">Este recibo comprova o pagamento da mensalidade referente ao período indicado.</div>
 </div>
 <script>setTimeout(()=>window.print(),400)</script>
 </body></html>`;
-  const w = window.open("","_blank");
+  const w = window.open("", "_blank");
   w.document.write(html);
   w.document.close();
 };
@@ -1148,7 +1227,7 @@ const exportarPDF = async (moradores, pagamentos, financeiro, filtros, titulo) =
   const pw = doc.internal.pageSize.getWidth();
   let y = 20;
 
-  const addLine = (text, x, yy, size=10, bold=false, color=[0,0,0]) => {
+  const addLine = (text, x, yy, size = 10, bold = false, color = [0, 0, 0]) => {
     doc.setFontSize(size); doc.setFont("helvetica", bold ? "bold" : "normal"); doc.setTextColor(...color); doc.text(text, x, yy);
   };
   const checkPage = () => { if (y > 270) { doc.addPage(); y = 20; } };
@@ -1159,74 +1238,74 @@ const exportarPDF = async (moradores, pagamentos, financeiro, filtros, titulo) =
 
   // Header
   doc.setFillColor(30, 41, 59); doc.rect(0, 0, pw, 30, "F");
-  addLine("Condomínio Boa Esperança", pw/2, 11, 15, true, [255,255,255]);
-  doc.setFontSize(9); doc.setTextColor(180,200,220);
-  doc.text(titulo, pw/2, 18, { align:"center" });
-  doc.text(`Período: ${mesLabel}   |   Gerado em ${new Date().toLocaleDateString("pt-BR")}`, pw/2, 24, { align:"center" });
+  addLine("Condomínio Boa Esperança", pw / 2, 11, 15, true, [255, 255, 255]);
+  doc.setFontSize(9); doc.setTextColor(180, 200, 220);
+  doc.text(titulo, pw / 2, 18, { align: "center" });
+  doc.text(`Período: ${mesLabel}   |   Gerado em ${new Date().toLocaleDateString("pt-BR")}`, pw / 2, 24, { align: "center" });
   y = 40;
 
   // ─── Bloco Financeiro ─────────────────────────────────────
-  addLine("RESUMO FINANCEIRO", 14, y, 11, true, [59,130,246]); y += 7;
-  doc.setDrawColor(59,130,246); doc.line(14, y, pw-14, y); y += 6;
+  addLine("RESUMO FINANCEIRO", 14, y, 11, true, [59, 130, 246]); y += 7;
+  doc.setDrawColor(59, 130, 246); doc.line(14, y, pw - 14, y); y += 6;
 
   const allItems = [
     ...pagamentos.map(p => {
       const m = moradores.find(x => x.casa_id === p.casa_id);
-      return { tipo:"entrada", descricao:`Mensalidade — ${m ? cap(m.nome) : p.casa_id}`, valor:p.valor, data:p.data_pagamento?.split("T")[0]||"", mes:p.mes };
+      return { tipo: "entrada", descricao: `Mensalidade — ${m ? cap(m.nome) : p.casa_id}`, valor: p.valor, data: p.data_pagamento?.split("T")[0] || "", mes: p.mes };
     }),
     ...financeiro.map(f => ({ ...f })),
   ].filter(i => {
-    const d = new Date((i.data||"")+"T12:00:00");
+    const d = new Date((i.data || "") + "T12:00:00");
     // Filtro por mês selecionado
-    if (filtros.mes) { const [y2,m2]=filtros.mes.split("-"); if(d.getFullYear()!==+y2||d.getMonth()+1!==+m2) return false; }
-    if (filtros.dataInicio && d<new Date(filtros.dataInicio+"T00:00:00")) return false;
-    if (filtros.dataFim    && d>new Date(filtros.dataFim+"T23:59:59"))    return false;
+    if (filtros.mes) { const [y2, m2] = filtros.mes.split("-"); if (d.getFullYear() !== +y2 || d.getMonth() + 1 !== +m2) return false; }
+    if (filtros.dataInicio && d < new Date(filtros.dataInicio + "T00:00:00")) return false;
+    if (filtros.dataFim && d > new Date(filtros.dataFim + "T23:59:59")) return false;
     return true;
   });
 
-  const tot = allItems.reduce((a,i)=>{ a[i.tipo]+=i.valor; return a; },{entrada:0,saida:0});
-  addLine(`Entradas:  ${R(tot.entrada)}`, 14, y, 10, false, [16,185,129]); y += 6;
-  addLine(`Saídas:    ${R(tot.saida)}`,   14, y, 10, false, [239,68,68]);  y += 6;
-  addLine(`Saldo:     ${R(tot.entrada-tot.saida)}`, 14, y, 10, true, tot.entrada-tot.saida>=0?[59,130,246]:[239,68,68]); y += 10;
+  const tot = allItems.reduce((a, i) => { a[i.tipo] += i.valor; return a; }, { entrada: 0, saida: 0 });
+  addLine(`Entradas:  ${R(tot.entrada)}`, 14, y, 10, false, [16, 185, 129]); y += 6;
+  addLine(`Saídas:    ${R(tot.saida)}`, 14, y, 10, false, [239, 68, 68]); y += 6;
+  addLine(`Saldo:     ${R(tot.entrada - tot.saida)}`, 14, y, 10, true, tot.entrada - tot.saida >= 0 ? [59, 130, 246] : [239, 68, 68]); y += 10;
 
   // Tabela lançamentos
-  addLine("LANÇAMENTOS DO PERÍODO", 14, y, 10, true, [100,116,139]); y += 6;
+  addLine("LANÇAMENTOS DO PERÍODO", 14, y, 10, true, [100, 116, 139]); y += 6;
   const cols = [14, 50, 130, 158];
-  doc.setFillColor(22,34,54); doc.rect(14, y-5, pw-28, 7, "F");
-  addLine("Data", cols[0], y, 8, true, [200,220,240]);
-  addLine("Descrição", cols[1], y, 8, true, [200,220,240]);
-  addLine("Tipo", cols[2], y, 8, true, [200,220,240]);
-  addLine("Valor", cols[3], y, 8, true, [200,220,240]);
+  doc.setFillColor(22, 34, 54); doc.rect(14, y - 5, pw - 28, 7, "F");
+  addLine("Data", cols[0], y, 8, true, [200, 220, 240]);
+  addLine("Descrição", cols[1], y, 8, true, [200, 220, 240]);
+  addLine("Tipo", cols[2], y, 8, true, [200, 220, 240]);
+  addLine("Valor", cols[3], y, 8, true, [200, 220, 240]);
   y += 6;
 
-  allItems.sort((a,b)=>new Date(b.data)-new Date(a.data)).forEach((item,i)=>{
+  allItems.sort((a, b) => new Date(b.data) - new Date(a.data)).forEach((item, i) => {
     checkPage();
-    if(i%2===0){ doc.setFillColor(245,248,252); doc.rect(14,y-4,pw-28,6,"F"); }
+    if (i % 2 === 0) { doc.setFillColor(245, 248, 252); doc.rect(14, y - 4, pw - 28, 6, "F"); }
     addLine(fmtData(item.data), cols[0], y, 8);
-    addLine(item.descricao.slice(0,40), cols[1], y, 8);
-    addLine(item.tipo==="entrada"?"Entrada":"Saída", cols[2], y, 8, false, item.tipo==="entrada"?[16,185,129]:[239,68,68]);
-    addLine((item.tipo==="saida"?"-":"+")+R(item.valor), cols[3], y, 8, false, item.tipo==="entrada"?[16,185,129]:[239,68,68]);
+    addLine(item.descricao.slice(0, 40), cols[1], y, 8);
+    addLine(item.tipo === "entrada" ? "Entrada" : "Saída", cols[2], y, 8, false, item.tipo === "entrada" ? [16, 185, 129] : [239, 68, 68]);
+    addLine((item.tipo === "saida" ? "-" : "+") + R(item.valor), cols[3], y, 8, false, item.tipo === "entrada" ? [16, 185, 129] : [239, 68, 68]);
     y += 6;
   });
 
   y += 8; checkPage();
 
   // ─── Bloco Moradores por Quadra — usando mesRef do filtro ──
-  addLine(`STATUS POR QUADRA — ${mesLabel.toUpperCase()}`, 14, y, 11, true, [59,130,246]); y += 7;
-  doc.setDrawColor(59,130,246); doc.line(14, y, pw-14, y); y += 6;
+  addLine(`STATUS POR QUADRA — ${mesLabel.toUpperCase()}`, 14, y, 11, true, [59, 130, 246]); y += 7;
+  doc.setDrawColor(59, 130, 246); doc.line(14, y, pw - 14, y); y += 6;
 
-  const quadras = [...new Set(moradores.map(m=>m.quadra))].sort();
+  const quadras = [...new Set(moradores.map(m => m.quadra))].sort();
   quadras.forEach(q => {
     checkPage();
-    addLine(`Quadra ${q}`, 14, y, 10, true, [148,163,184]); y += 6;
-    moradores.filter(m=>m.quadra===q)
-      .sort((a,b)=>a.numero_casa.localeCompare(b.numero_casa,"pt-BR",{numeric:true}))
+    addLine(`Quadra ${q}`, 14, y, 10, true, [148, 163, 184]); y += 6;
+    moradores.filter(m => m.quadra === q)
+      .sort((a, b) => a.numero_casa.localeCompare(b.numero_casa, "pt-BR", { numeric: true }))
       .forEach(m => {
         checkPage();
         // Status calculado com o mês do filtro — nunca fixo
         const st = getStatus(m.casa_id, mesRef, pagamentos);
         addLine(`Casa ${m.numero_casa}  ${cap(m.nome)}`, 18, y, 9);
-        addLine(st==="pago"?"✓ Adimplente":"✗ Inadimplente", 148, y, 9, true, st==="pago"?[16,185,129]:[239,68,68]);
+        addLine(st === "pago" ? "✓ Adimplente" : "✗ Inadimplente", 148, y, 9, true, st === "pago" ? [16, 185, 129] : [239, 68, 68]);
         y += 6;
       });
     y += 2;
@@ -1248,15 +1327,15 @@ const exportarExcel = async (moradores, pagamentos, financeiro, filtros) => {
   const wb = XLSX.utils.book_new();
 
   // Mês de referência do filtro
-  const mesRef  = filtros.mes ? isoParaMes(filtros.mes) : getMesNow();
-  const mesISO  = filtros.mes || mesParaISO(getMesNow());
+  const mesRef = filtros.mes ? isoParaMes(filtros.mes) : getMesNow();
+  const mesISO = filtros.mes || mesParaISO(getMesNow());
 
   // Filtro de lançamentos pelo mês
   const finFiltrado = financeiro.filter(f => {
     if (!filtros.mes) return true;
-    const d = new Date(f.data+"T12:00:00");
-    const [y2,m2] = filtros.mes.split("-");
-    return d.getFullYear()===+y2 && d.getMonth()+1===+m2;
+    const d = new Date(f.data + "T12:00:00");
+    const [y2, m2] = filtros.mes.split("-");
+    return d.getFullYear() === +y2 && d.getMonth() + 1 === +m2;
   });
 
   const pagFiltrado = pagamentos.filter(p => {
@@ -1267,18 +1346,18 @@ const exportarExcel = async (moradores, pagamentos, financeiro, filtros) => {
   // Aba 1: Financeiro do período
   const rowsFin = [
     [`Financeiro — ${cap(fmtMes(mesRef))}`],
-    ["Data","Tipo","Descrição","Categoria","Valor (R$)"],
-    ...finFiltrado.map(f=>[fmtData(f.data), f.tipo==="entrada"?"Entrada":"Saída", f.descricao, f.categoria||"", f.valor]),
+    ["Data", "Tipo", "Descrição", "Categoria", "Valor (R$)"],
+    ...finFiltrado.map(f => [fmtData(f.data), f.tipo === "entrada" ? "Entrada" : "Saída", f.descricao, f.categoria || "", f.valor]),
   ];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rowsFin), "Financeiro");
 
   // Aba 2: Mensalidades do período
   const rowsPag = [
     [`Mensalidades — ${cap(fmtMes(mesRef))}`],
-    ["Casa","Morador","Mês","Valor","Data Pagamento","Forma"],
-    ...pagFiltrado.map(p=>{
-      const m = moradores.find(x=>x.casa_id===p.casa_id);
-      return [p.casa_id, m?cap(m.nome):"—", fmtMes(p.mes), p.valor, fmtData(p.data_pagamento), cap(p.forma_pagamento)];
+    ["Casa", "Morador", "Mês", "Valor", "Data Pagamento", "Forma"],
+    ...pagFiltrado.map(p => {
+      const m = moradores.find(x => x.casa_id === p.casa_id);
+      return [p.casa_id, m ? cap(m.nome) : "—", fmtMes(p.mes), p.valor, fmtData(p.data_pagamento), cap(p.forma_pagamento)];
     }),
   ];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rowsPag), "Mensalidades");
@@ -1286,26 +1365,68 @@ const exportarExcel = async (moradores, pagamentos, financeiro, filtros) => {
   // Aba 3: Status por morador — baseado no mesRef do filtro (dinâmico, nunca salvo)
   const rowsMor = [
     [`Status dos Moradores — ${cap(fmtMes(mesRef))}`],
-    ["Casa","Quadra","Nº","Nome","Telefone",`Status ${cap(fmtMes(mesRef))}`],
-    ...moradores.sort((a,b)=>a.nome.localeCompare(b.nome,"pt-BR")).map(m=>[
+    ["Casa", "Quadra", "Nº", "Nome", "Telefone", `Status ${cap(fmtMes(mesRef))}`],
+    ...moradores.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")).map(m => [
       m.casa_id, m.quadra, m.numero_casa, cap(m.nome), m.telefone,
       // Status calculado dinamicamente pelo mês do filtro
-      getStatus(m.casa_id, mesRef, pagamentos)==="pago" ? "Adimplente" : "Inadimplente",
+      getStatus(m.casa_id, mesRef, pagamentos) === "pago" ? "Adimplente" : "Inadimplente",
     ]),
   ];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rowsMor), "Moradores");
 
   const nomeArq = filtros.mes
     ? `condominio-${filtros.mes}.xlsx`
-    : `condominio-${new Date().toISOString().slice(0,10)}.xlsx`;
+    : `condominio-${new Date().toISOString().slice(0, 10)}.xlsx`;
   XLSX.writeFile(wb, nomeArq);
 };
+
+// ============================================================
+// HELPERS DE IMPRESSÃO DE RELATÓRIOS
+// ============================================================
+const htmlRelatorio = (titulo, mesLabel, linhas, colunas, resumo = null) => `
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+<title>${titulo}</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI',Arial,sans-serif;background:#fff;padding:24px;color:#1e293b;font-size:13px}
+  .header{text-align:center;border-bottom:3px solid #1e293b;padding-bottom:16px;margin-bottom:20px}
+  .header h1{font-size:20px;font-weight:800;color:#1e293b}
+  .header p{font-size:12px;color:#64748b;margin-top:4px}
+  .resumo{display:flex;gap:16px;margin-bottom:20px;flex-wrap:wrap}
+  .resumo-card{border:1px solid #e2e8f0;border-radius:8px;padding:10px 16px;flex:1;min-width:120px;text-align:center}
+  .resumo-card .val{font-size:20px;font-weight:800;margin-top:4px}
+  .resumo-card .lb{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#64748b}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{background:#1e293b;color:#fff;padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+  td{padding:8px 10px;border-bottom:1px solid #f1f5f9}
+  tr:nth-child(even) td{background:#f8fafc}
+  .pago{color:#059669;font-weight:700}
+  .pendente{color:#d97706;font-weight:700}
+  .entrada{color:#059669}
+  .saida{color:#dc2626}
+  .footer{margin-top:24px;text-align:center;font-size:10px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:12px}
+  @media print{body{padding:12px}button{display:none!important}}
+</style>
+</head><body>
+<div class="header">
+  <h1>🏘️ Condomínio Boa Esperança</h1>
+  <p>${titulo} — ${mesLabel}</p>
+  <p>Gerado em ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</p>
+</div>
+${resumo ? `<div class="resumo">${resumo}</div>` : ""}
+<table>
+  <thead><tr>${colunas.map(c => `<th>${c}</th>`).join("")}</tr></thead>
+  <tbody>${linhas}</tbody>
+</table>
+<div class="footer">Relatório gerado automaticamente pelo sistema de gestão do Condomínio Boa Esperança</div>
+<script>setTimeout(()=>window.print(),400)</script>
+</body></html>`;
 
 // ============================================================
 // RELATÓRIOS
 // ============================================================
 const Relatorios = ({ moradores, pagamentos, financeiro }) => {
-  const [aba,     setAba]     = useState("financeiro"); // financeiro | quadra | geral
+  const [aba, setAba] = useState("financeiro"); // financeiro | quadra | geral
   const [filtros, setFiltros] = useState({ tipo: "todos", mes: "", dataInicio: "", dataFim: "", categoria: "" });
   const [mesQuadra, setMesQuadra] = useState(getMesNow());
   const [exportando, setExportando] = useState(false);
@@ -1314,27 +1435,47 @@ const Relatorios = ({ moradores, pagamentos, financeiro }) => {
 
   // ── Dados financeiros ──────────────────────────────────────
   const allItems = [
-    ...pagamentos.map(p => ({ id:p.id, tipo:"entrada", descricao:`MENSALIDADE — ${getNome(p.casa_id)} (${p.casa_id})`, valor:p.valor, data:p.data_pagamento?.split("T")[0]||"", categoria:"mensalidade", sub:cap(fmtMes(p.mes)), _pag:p })),
-    ...financeiro.map(f => ({ ...f, sub:f.categoria?cap(f.categoria):undefined })),
+    ...pagamentos.map(p => ({ id: p.id, tipo: "entrada", descricao: `MENSALIDADE — ${getNome(p.casa_id)} (${p.casa_id})`, valor: p.valor, data: p.data_pagamento?.split("T")[0] || "", categoria: "mensalidade", sub: cap(fmtMes(p.mes)), _pag: p })),
+    ...financeiro.map(f => ({ ...f, sub: f.categoria ? cap(f.categoria) : undefined })),
   ].filter(i => {
     if (filtros.tipo !== "todos" && i.tipo !== filtros.tipo) return false;
     if (filtros.categoria && i.categoria !== filtros.categoria) return false;
-    const d = new Date((i.data||"")+"T12:00:00");
-    if (filtros.mes) { const [y,m]=filtros.mes.split("-"); if(d.getFullYear()!==+y||d.getMonth()+1!==+m) return false; }
-    if (filtros.dataInicio && d<new Date(filtros.dataInicio+"T00:00:00")) return false;
-    if (filtros.dataFim    && d>new Date(filtros.dataFim+"T23:59:59"))    return false;
+    const d = new Date((i.data || "") + "T12:00:00");
+    if (filtros.mes) { const [y, m] = filtros.mes.split("-"); if (d.getFullYear() !== +y || d.getMonth() + 1 !== +m) return false; }
+    if (filtros.dataInicio && d < new Date(filtros.dataInicio + "T00:00:00")) return false;
+    if (filtros.dataFim && d > new Date(filtros.dataFim + "T23:59:59")) return false;
     return true;
-  }).sort((a,b)=>new Date(b.data)-new Date(a.data));
+  }).sort((a, b) => new Date(b.data) - new Date(a.data));
 
-  const tot = allItems.reduce((a,i)=>{ a[i.tipo]+=i.valor; return a; },{entrada:0,saida:0});
-  const grupos = allItems.reduce((acc,i)=>{ const k=i.data?.slice(0,7)||""; if(!acc[k]) acc[k]=[]; acc[k].push(i); return acc; },{});
+  const tot = allItems.reduce((a, i) => { a[i.tipo] += i.valor; return a; }, { entrada: 0, saida: 0 });
+  const grupos = allItems.reduce((acc, i) => { const k = i.data?.slice(0, 7) || ""; if (!acc[k]) acc[k] = []; acc[k].push(i); return acc; }, {});
 
   // ── Dados por quadra ───────────────────────────────────────
-  const quadras = [...new Set(moradores.map(m=>m.quadra))].sort();
+  const quadras = [...new Set(moradores.map(m => m.quadra))].sort();
 
-  const limpar = () => setFiltros({ tipo:"todos", mes:"", dataInicio:"", dataFim:"", categoria:"" });
-  const filtroAtivo = filtros.mes||filtros.dataInicio||filtros.dataFim||filtros.categoria||filtros.tipo!=="todos";
+  const limpar = () => setFiltros({ tipo: "todos", mes: "", dataInicio: "", dataFim: "", categoria: "" });
+  const filtroAtivo = filtros.mes || filtros.dataInicio || filtros.dataFim || filtros.categoria || filtros.tipo !== "todos";
 
+  const handleDelete = async (item) => {
+    const msg = `Excluir lançamento: "${item.descricao}"?\nValor: ${R(item.valor)}`;
+    if (!confirm(msg)) return;
+
+    try {
+      // Verifica se é um pagamento de mensalidade ou um lançamento financeiro comum
+      const tabela = item.categoria === "mensalidade" ? "pagamentos" : "financeiro";
+
+      // Chamada para o seu backend/Supabase
+      const { error } = await supabase.from(tabela).delete().eq("id", item.id);
+
+      if (error) throw error;
+
+      alert("Lançamento excluído!");
+      // Dica: Recarregue os dados aqui ou use um router.refresh() se estiver no Next.js
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao excluir. Tente novamente.");
+    }
+  };
   const handlePDF = async () => {
     setExportando(true);
     try { await exportarPDF(moradores, pagamentos, financeiro, filtros, "Relatório Geral"); }
@@ -1344,176 +1485,196 @@ const Relatorios = ({ moradores, pagamentos, financeiro }) => {
 
   const handleExcel = async () => {
     setExportando(true);
-    try { await exportarExcel(moradores, pagamentos, financeiro, filtros); }
+    try { await exportarExcel(moradores, pagamentos, financeiro); }
     catch { alert("Erro ao gerar Excel"); }
     finally { setExportando(false); }
   };
 
-  const IS11 = { background:C.bg, border:`1px solid ${C.border2}`, borderRadius:8, padding:"8px 9px", color:C.text, fontSize:11, outline:"none", fontFamily:"inherit" };
+  const IS11 = { background: C.bg, border: `1px solid ${C.border2}`, borderRadius: 8, padding: "8px 9px", color: C.text, fontSize: 11, outline: "none", fontFamily: "inherit" };
 
   return (
-    <div style={{ padding:"20px 16px 88px" }}>
-      <h1 style={{ color:C.text, fontSize:22, fontWeight:900, marginBottom:14 }}>📊 Relatórios</h1>
+    <div style={{ padding: "20px 16px 88px" }}>
+      <h1 style={{ color: C.text, fontSize: 22, fontWeight: 900, marginBottom: 14 }}>📊 Relatórios</h1>
 
       {/* Botões exportação */}
-      <div style={{ display:"flex", gap:8, marginBottom:14 }}>
-        <Btn v="danger" sz="sm" loading={exportando} onClick={handlePDF} sx={{ flex:1 }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+        <Btn v="danger" sz="sm" loading={exportando} onClick={handlePDF} sx={{ flex: 1 }}>
           📄 Exportar PDF
         </Btn>
-        <Btn v="success" sz="sm" loading={exportando} onClick={handleExcel} sx={{ flex:1 }}>
+        <Btn v="success" sz="sm" loading={exportando} onClick={handleExcel} sx={{ flex: 1 }}>
           📊 Exportar Excel
         </Btn>
       </div>
 
       {/* Abas */}
-      <div style={{ display:"flex", gap:6, marginBottom:14 }}>
-        {[["financeiro","💰 Financeiro"],["quadra","🏘️ Por Quadra"],["geral","📋 Geral"]].map(([k,l])=>(
-          <button key={k} onClick={()=>setAba(k)}
-            style={{ flex:1, padding:"8px 4px", borderRadius:10, border:`1.5px solid ${aba===k?C.accent:C.border}`, background:aba===k?`${C.accent}18`:"transparent", color:aba===k?C.accent:C.muted, fontSize:11, fontWeight:700, cursor:"pointer", fontFamily:"inherit" }}>
+      <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+        {[["financeiro", "💰 Financeiro"], ["quadra", "🏘️ Por Quadra"], ["geral", "📋 Geral"]].map(([k, l]) => (
+          <button key={k} onClick={() => setAba(k)}
+            style={{ flex: 1, padding: "8px 4px", borderRadius: 10, border: `1.5px solid ${aba === k ? C.accent : C.border}`, background: aba === k ? `${C.accent}18` : "transparent", color: aba === k ? C.accent : C.muted, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
             {l}
           </button>
         ))}
       </div>
 
       {/* ── ABA FINANCEIRO ─────────────────────────────── */}
-      {aba==="financeiro" && (
+      {aba === "financeiro" && (
         <>
-          <Crd sx={{ marginBottom:14 }}>
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8 }}>
-              {[{lb:"Entradas",val:tot.entrada,c:C.green},{lb:"Saídas",val:tot.saida,c:C.red},{lb:"Saldo",val:tot.entrada-tot.saida,c:tot.entrada-tot.saida>=0?C.accent:C.red}].map(x=>(
-                <div key={x.lb} style={{ textAlign:"center", borderRight:x.lb!=="Saldo"?`1px solid ${C.border}`:"none", padding:"4px 0" }}>
-                  <div style={{ color:C.muted, fontSize:9, fontWeight:700, textTransform:"uppercase", letterSpacing:.5 }}>{x.lb}</div>
-                  <div style={{ color:x.c, fontWeight:800, fontSize:13, marginTop:5 }}>{R(x.val)}</div>
+          <Crd sx={{ marginBottom: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+              {[{ lb: "Entradas", val: tot.entrada, c: C.green }, { lb: "Saídas", val: tot.saida, c: C.red }, { lb: "Saldo", val: tot.entrada - tot.saida, c: tot.entrada - tot.saida >= 0 ? C.accent : C.red }].map(x => (
+                <div key={x.lb} style={{ textAlign: "center", borderRight: x.lb !== "Saldo" ? `1px solid ${C.border}` : "none", padding: "4px 0" }}>
+                  <div style={{ color: C.muted, fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: .5 }}>{x.lb}</div>
+                  <div style={{ color: x.c, fontWeight: 800, fontSize: 13, marginTop: 5 }}>{R(x.val)}</div>
                 </div>
               ))}
             </div>
           </Crd>
 
           {/* Filtros */}
-          <Crd sx={{ marginBottom:14 }}>
-            <div style={{ display:"flex", gap:6, marginBottom:9 }}>
-              {[["todos","Todos"],["entrada","📈 Ent."],["saida","📉 Saí."]].map(([v,l])=>(
-                <button key={v} onClick={()=>setFiltros(p=>({...p,tipo:v}))}
-                  style={{ flex:1, padding:"7px 4px", borderRadius:8, border:`1px solid ${filtros.tipo===v?C.accent:C.border2}`, background:filtros.tipo===v?`${C.accent}18`:"transparent", color:filtros.tipo===v?C.accent:C.muted, fontSize:11, fontWeight:600, cursor:"pointer", fontFamily:"inherit" }}>
+          <Crd sx={{ marginBottom: 14 }}>
+            <div style={{ display: "flex", gap: 6, marginBottom: 9 }}>
+              {[["todos", "Todos"], ["entrada", "📈 Ent."], ["saida", "📉 Saí."]].map(([v, l]) => (
+                <button key={v} onClick={() => setFiltros(p => ({ ...p, tipo: v }))}
+                  style={{ flex: 1, padding: "7px 4px", borderRadius: 8, border: `1px solid ${filtros.tipo === v ? C.accent : C.border2}`, background: filtros.tipo === v ? `${C.accent}18` : "transparent", color: filtros.tipo === v ? C.accent : C.muted, fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                   {l}
                 </button>
               ))}
             </div>
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:7 }}>
-              <input type="month" value={filtros.mes} onChange={e=>setFiltros(p=>({...p,mes:e.target.value}))} style={IS11}/>
-              <select value={filtros.categoria} onChange={e=>setFiltros(p=>({...p,categoria:e.target.value}))} style={IS11}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
+              <input type="month" value={filtros.mes} onChange={e => setFiltros(p => ({ ...p, mes: e.target.value }))} style={IS11} />
+              <select value={filtros.categoria} onChange={e => setFiltros(p => ({ ...p, categoria: e.target.value }))} style={IS11}>
                 <option value="">Todas categ.</option>
                 <option value="mensalidade">Mensalidade</option>
-                {CATEGORIAS.map(c=><option key={c} value={c}>{cap(c)}</option>)}
+                {CATEGORIAS.map(c => <option key={c} value={c}>{cap(c)}</option>)}
               </select>
-              <input type="date" value={filtros.dataInicio} onChange={e=>setFiltros(p=>({...p,dataInicio:e.target.value}))} style={IS11}/>
-              <input type="date" value={filtros.dataFim}    onChange={e=>setFiltros(p=>({...p,dataFim:e.target.value}))}    style={IS11}/>
+              <input type="date" value={filtros.dataInicio} onChange={e => setFiltros(p => ({ ...p, dataInicio: e.target.value }))} style={IS11} />
+              <input type="date" value={filtros.dataFim} onChange={e => setFiltros(p => ({ ...p, dataFim: e.target.value }))} style={IS11} />
             </div>
-            {filtroAtivo && <button onClick={limpar} style={{ background:"none", border:"none", color:C.muted, fontSize:11, cursor:"pointer", marginTop:7, padding:0, fontFamily:"inherit" }}>✕ Limpar filtros</button>}
+            {filtroAtivo && <button onClick={limpar} style={{ background: "none", border: "none", color: C.muted, fontSize: 11, cursor: "pointer", marginTop: 7, padding: 0, fontFamily: "inherit" }}>✕ Limpar filtros</button>}
           </Crd>
 
           {/* Extrato agrupado por mês */}
-          {Object.keys(grupos).length===0
-            ? <div style={{ textAlign:"center", color:C.muted, marginTop:40, fontSize:13 }}>Nenhum registro encontrado</div>
-            : Object.entries(grupos).sort(([a],[b])=>b.localeCompare(a)).map(([chave,items])=>{
-                const totG = items.reduce((a,i)=>{ a[i.tipo]+=i.valor; return a; },{entrada:0,saida:0});
-                return (
-                  <div key={chave} style={{ marginBottom:16 }}>
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
-                      <span style={{ color:C.sub, fontSize:11, fontWeight:700, textTransform:"uppercase", letterSpacing:.5 }}>
-                        {chave ? cap(fmtMes(chave.split("-").reverse().join("-"))) : "Sem data"}
-                      </span>
-                      <span style={{ color:totG.entrada-totG.saida>=0?C.green:C.red, fontSize:11, fontWeight:700 }}>
-                        {totG.entrada-totG.saida>=0?"+":""}{R(totG.entrada-totG.saida)}
-                      </span>
-                    </div>
-                    <Crd sx={{ padding:0, overflow:"hidden" }}>
-                      {items.map((item,i)=>(
-                        <div key={item.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"11px 14px", background:i%2===0?C.card:C.card2, borderBottom:i<items.length-1?`1px solid ${C.border}`:"none" }}>
-                          <div style={{ width:30, height:30, borderRadius:8, background:item.tipo==="entrada"?`${C.green}15`:`${C.red}15`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, flexShrink:0 }}>
-                            {item.tipo==="entrada"?"📈":"📉"}
-                          </div>
-                          <div style={{ flex:1, minWidth:0 }}>
-                            <div style={{ color:C.text, fontWeight:500, fontSize:12, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{item.descricao}</div>
-                            <div style={{ display:"flex", gap:5, marginTop:2, alignItems:"center" }}>
-                              <span style={{ color:C.muted, fontSize:10 }}>{fmtData(item.data)}</span>
-                              {item.sub && <span style={{ background:C.border2, color:C.sub, borderRadius:3, padding:"1px 5px", fontSize:9, fontWeight:700 }}>{item.sub}</span>}
-                            </div>
-                          </div>
-                          <div style={{ display:"flex", alignItems:"center", gap:6, flexShrink:0 }}>
-                            <span style={{ color:item.tipo==="entrada"?C.green:C.red, fontWeight:800, fontSize:12 }}>
-                              {item.tipo==="saida"?"-":"+"}{R(item.valor)}
-                            </span>
-                            {/* Botão recibo só para mensalidades */}
-                            {item._pag && (
-                              <button onClick={()=>{ const m=moradores.find(x=>x.casa_id===item._pag.casa_id); gerarRecibo(item._pag,m); }}
-                                style={{ background:`${C.accent}18`, border:`1px solid ${C.accent}33`, borderRadius:6, padding:"3px 7px", fontSize:9, fontWeight:700, color:C.accent, cursor:"pointer", whiteSpace:"nowrap" }}>
-                                🧾 Recibo
-                              </button>
-                            )}
+          {Object.keys(grupos).length === 0
+            ? <div style={{ textAlign: "center", color: C.muted, marginTop: 40, fontSize: 13 }}>Nenhum registro encontrado</div>
+            : Object.entries(grupos).sort(([a], [b]) => b.localeCompare(a)).map(([chave, items]) => {
+              const totG = items.reduce((a, i) => { a[i.tipo] += i.valor; return a; }, { entrada: 0, saida: 0 });
+              return (
+                <div key={chave} style={{ marginBottom: 16 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                    <span style={{ color: C.sub, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: .5 }}>
+                      {chave ? cap(fmtMes(chave.split("-").reverse().join("-"))) : "Sem data"}
+                    </span>
+                    <span style={{ color: totG.entrada - totG.saida >= 0 ? C.green : C.red, fontSize: 11, fontWeight: 700 }}>
+                      {totG.entrada - totG.saida >= 0 ? "+" : ""}{R(totG.entrada - totG.saida)}
+                    </span>
+                  </div>
+                  <Crd sx={{ padding: 0, overflow: "hidden" }}>
+                    {items.map((item, i) => (
+                      <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 14px", background: i % 2 === 0 ? C.card : C.card2, borderBottom: i < items.length - 1 ? `1px solid ${C.border}` : "none" }}>
+                        <div style={{ width: 30, height: 30, borderRadius: 8, background: item.tipo === "entrada" ? `${C.green}15` : `${C.red}15`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, flexShrink: 0 }}>
+                          {item.tipo === "entrada" ? "📈" : "📉"}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ color: C.text, fontWeight: 500, fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.descricao}</div>
+                          <div style={{ display: "flex", gap: 5, marginTop: 2, alignItems: "center" }}>
+                            <span style={{ color: C.muted, fontSize: 10 }}>{fmtData(item.data)}</span>
+                            {item.sub && <span style={{ background: C.border2, color: C.sub, borderRadius: 3, padding: "1px 5px", fontSize: 9, fontWeight: 700 }}>{item.sub}</span>}
                           </div>
                         </div>
-                      ))}
-                    </Crd>
-                  </div>
-                );
-              })
+                        {/* ... código anterior do map ... */}
+
+                        {/* LOCAL EXATO: Substitua o bloco final por este aqui */}
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                          <span style={{ color: item.tipo === "entrada" ? C.green : C.red, fontWeight: 800, fontSize: 12 }}>
+                            {item.tipo === "saida" ? "-" : "+"}{R(item.valor)}
+                          </span>
+
+                          {/* Recibo apenas para mensalidades */}
+                          {item._pag && (
+                            <button onClick={() => { const m = moradores.find(x => x.casa_id === item._pag.casa_id); gerarRecibo(item._pag, m); }}
+                              style={{ background: `${C.accent}18`, border: `1px solid ${C.accent}33`, borderRadius: 6, padding: "3px 7px", fontSize: 9, fontWeight: 700, color: C.accent, cursor: "pointer" }}>
+                              🧾
+                            </button>
+                          )}
+
+                          {/* Botão de Excluir minimalista */}
+                          <button onClick={() => handleDelete(item)}
+                            style={{
+                              background: `${C.red}12`,
+                              border: `1px solid ${C.red}25`,
+                              borderRadius: 6,
+                              padding: "3px 6px",
+                              fontSize: 10,
+                              cursor: "pointer",
+                              color: C.red,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center"
+                            }}>
+                            🗑️
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </Crd>
+                </div>
+              );
+            })
           }
         </>
       )}
 
       {/* ── ABA POR QUADRA ─────────────────────────────── */}
-      {aba==="quadra" && (
+      {aba === "quadra" && (
         <>
-          <div style={{ marginBottom:14 }}><NavMes mes={mesQuadra} setMes={setMesQuadra}/></div>
+          <div style={{ marginBottom: 14 }}><NavMes mes={mesQuadra} setMes={setMesQuadra} /></div>
 
           {/* Resumo */}
           {(() => {
-            // Status calculado com o mês selecionado na navegação — não o mês atual
-            const adim = moradores.filter(m=>getStatus(m.casa_id, mesQuadra, pagamentos)==="pago").length;
+            const adim = moradores.filter(m => getStatus(m.casa_id, mesQuadra, pagamentos) === "pago").length;
             const inad = moradores.length - adim;
             return (
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:9, marginBottom:14 }}>
-                {[{lb:"Total",val:moradores.length,c:C.accent},{lb:"Adimplentes",val:adim,c:C.green},{lb:"Inadimplentes",val:inad,c:C.red}].map(x=>(
-                  <Crd key={x.lb} sx={{ padding:"11px 10px", textAlign:"center", border:`1px solid ${x.c}20` }}>
-                    <div style={{ color:C.muted, fontSize:9, fontWeight:700, textTransform:"uppercase" }}>{x.lb}</div>
-                    <div style={{ color:x.c, fontSize:20, fontWeight:900, marginTop:5 }}>{x.val}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 9, marginBottom: 14 }}>
+                {[{ lb: "Total", val: moradores.length, c: C.accent }, { lb: "Adimplentes", val: adim, c: C.green }, { lb: "Inadimplentes", val: inad, c: C.red }].map(x => (
+                  <Crd key={x.lb} sx={{ padding: "11px 10px", textAlign: "center", border: `1px solid ${x.c}20` }}>
+                    <div style={{ color: C.muted, fontSize: 9, fontWeight: 700, textTransform: "uppercase" }}>{x.lb}</div>
+                    <div style={{ color: x.c, fontSize: 20, fontWeight: 900, marginTop: 5 }}>{x.val}</div>
                   </Crd>
                 ))}
               </div>
             );
           })()}
 
-          {quadras.map(q=>{
-            const daCasa = moradores.filter(m=>m.quadra===q).sort((a,b)=>a.numero_casa.localeCompare(b.numero_casa,"pt-BR",{numeric:true}));
-            const adimQ  = daCasa.filter(m=>getStatus(m.casa_id,mesQuadra,pagamentos)==="pago").length;
+          {quadras.map(q => {
+            const daCasa = moradores.filter(m => m.quadra === q).sort((a, b) => a.numero_casa.localeCompare(b.numero_casa, "pt-BR", { numeric: true }));
+            const adimQ = daCasa.filter(m => getStatus(m.casa_id, mesQuadra, pagamentos) === "pago").length;
             return (
-              <div key={q} style={{ marginBottom:16 }}>
-                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
-                  <span style={{ color:C.sub, fontWeight:800, fontSize:12, textTransform:"uppercase", letterSpacing:.5 }}>
+              <div key={q} style={{ marginBottom: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <span style={{ color: C.sub, fontWeight: 800, fontSize: 12, textTransform: "uppercase", letterSpacing: .5 }}>
                     🏘️ Quadra {q}
                   </span>
-                  <span style={{ color:C.muted, fontSize:11 }}>{adimQ}/{daCasa.length} pagos</span>
+                  <span style={{ color: C.muted, fontSize: 11 }}>{adimQ}/{daCasa.length} pagos</span>
                 </div>
-                <Crd sx={{ padding:0, overflow:"hidden" }}>
-                  {daCasa.map((m,i)=>{
-                    const st = getStatus(m.casa_id, mesQuadra, pagamentos); // usa o mês selecionado
+                <Crd sx={{ padding: 0, overflow: "hidden" }}>
+                  {daCasa.map((m, i) => {
+                    const st = getStatus(m.casa_id, mesQuadra, pagamentos);
                     return (
-                      <div key={m.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"11px 14px", background:i%2===0?C.card:C.card2, borderBottom:i<daCasa.length-1?`1px solid ${C.border}`:"none" }}>
-                        <div style={{ width:34, height:34, borderRadius:9, background:st==="pago"?`${C.green}15`:`${C.yellow}15`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, flexShrink:0 }}>
+                      <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 14px", background: i % 2 === 0 ? C.card : C.card2, borderBottom: i < daCasa.length - 1 ? `1px solid ${C.border}` : "none" }}>
+                        <div style={{ width: 34, height: 34, borderRadius: 9, background: st === "pago" ? `${C.green}15` : `${C.yellow}15`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}>
                           🏠
                         </div>
-                        <div style={{ flex:1 }}>
-                          <div style={{ color:C.text, fontWeight:600, fontSize:13 }}>{cap(m.nome)}</div>
-                          <div style={{ color:C.muted, fontSize:11, marginTop:2 }}>Casa {m.numero_casa} · {m.telefone}</div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ color: C.text, fontWeight: 600, fontSize: 13 }}>{cap(m.nome)}</div>
+                          <div style={{ color: C.muted, fontSize: 11, marginTop: 2 }}>Casa {m.numero_casa} · {m.telefone}</div>
                         </div>
-                        <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:5 }}>
-                          <span style={{ background:st==="pago"?`${C.green}18`:`${C.yellow}18`, color:st==="pago"?C.green:C.yellow, border:`1px solid ${st==="pago"?C.green:C.yellow}33`, borderRadius:20, padding:"2px 9px", fontSize:10, fontWeight:700 }}>
-                            {st==="pago"?"✅ Adimplente":"⏳ Inadimplente"}
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5 }}>
+                          <span style={{ background: st === "pago" ? `${C.green}18` : `${C.yellow}18`, color: st === "pago" ? C.green : C.yellow, border: `1px solid ${st === "pago" ? C.green : C.yellow}33`, borderRadius: 20, padding: "2px 9px", fontSize: 10, fontWeight: 700 }}>
+                            {st === "pago" ? "✅ Adimplente" : "⏳ Inadimplente"}
                           </span>
-                          {st!=="pago" && m.telefone && (
-                            <a href={waLink(m.telefone,m.nome,mesQuadra)} target="_blank" rel="noreferrer"
-                              style={{ background:"#25d36615", color:"#25d366", border:"1px solid #25d36630", borderRadius:6, padding:"2px 7px", fontSize:9, fontWeight:700, textDecoration:"none" }}>
+                          {st !== "pago" && m.telefone && (
+                            <a href={waLink(m.telefone, m.nome, mesQuadra)} target="_blank" rel="noreferrer"
+                              style={{ background: "#25d36615", color: "#25d366", border: "1px solid #25d36630", borderRadius: 6, padding: "2px 7px", fontSize: 9, fontWeight: 700, textDecoration: "none" }}>
                               📱 WhatsApp
                             </a>
                           )}
@@ -1529,22 +1690,22 @@ const Relatorios = ({ moradores, pagamentos, financeiro }) => {
       )}
 
       {/* ── ABA GERAL ───────────────────────────────────── */}
-      {aba==="geral" && (
+      {aba === "geral" && (
         <>
-          <Crd sx={{ marginBottom:14 }}>
-            <div style={{ color:C.text, fontWeight:700, fontSize:14, marginBottom:12 }}>📋 Relatório Consolidado</div>
-            <div style={{ color:C.sub, fontSize:12, lineHeight:1.7 }}>
-              Este relatório reúne em um único PDF:<br/>
-              • Resumo financeiro completo (entradas e saídas)<br/>
-              • Lista de todos os lançamentos<br/>
-              • Situação por quadra (adimplente / inadimplente)<br/>
+          <Crd sx={{ marginBottom: 14 }}>
+            <div style={{ color: C.text, fontWeight: 700, fontSize: 14, marginBottom: 12 }}>📋 Relatório Consolidado</div>
+            <div style={{ color: C.sub, fontSize: 12, lineHeight: 1.7 }}>
+              Este relatório reúne em um único PDF:<br />
+              • Resumo financeiro completo (entradas e saídas)<br />
+              • Lista de todos os lançamentos<br />
+              • Situação por quadra (adimplente / inadimplente)<br />
             </div>
-            <div style={{ marginTop:16 }}>
+            <div style={{ marginTop: 16 }}>
               <Btn v="danger" full sz="lg" loading={exportando} onClick={handlePDF}>
                 📄 Gerar Relatório Geral em PDF
               </Btn>
             </div>
-            <div style={{ marginTop:10 }}>
+            <div style={{ marginTop: 10 }}>
               <Btn v="success" full sz="lg" loading={exportando} onClick={handleExcel}>
                 📊 Exportar Planilha Excel (3 abas)
               </Btn>
@@ -1552,39 +1713,38 @@ const Relatorios = ({ moradores, pagamentos, financeiro }) => {
           </Crd>
 
           {/* Preview resumo */}
-          <Crd sx={{ marginBottom:14 }}>
-            <div style={{ color:C.text, fontWeight:700, fontSize:13, marginBottom:12 }}>💰 Resumo Financeiro Total</div>
-            {(()=>{
-              const tRec  = pagamentos.reduce((a,p)=>a+p.valor,0);
-              const tEnt  = financeiro.filter(f=>f.tipo==="entrada").reduce((a,f)=>a+f.valor,0);
-              const tSai  = financeiro.filter(f=>f.tipo==="saida").reduce((a,f)=>a+f.valor,0);
-              const saldo = tRec+tEnt-tSai;
+          <Crd sx={{ marginBottom: 14 }}>
+            <div style={{ color: C.text, fontWeight: 700, fontSize: 13, marginBottom: 12 }}>💰 Resumo Financeiro Total</div>
+            {(() => {
+              const tRec = pagamentos.reduce((a, p) => a + p.valor, 0);
+              const tEnt = financeiro.filter(f => f.tipo === "entrada").reduce((a, f) => a + f.valor, 0);
+              const tSai = financeiro.filter(f => f.tipo === "saida").reduce((a, f) => a + f.valor, 0);
+              const saldo = tRec + tEnt - tSai;
               return [
-                {lb:"Total mensalidades recebidas", val:R(tRec),     c:C.green },
-                {lb:"Outras entradas",               val:R(tEnt),     c:C.green },
-                {lb:"Total saídas",                  val:R(tSai),     c:C.red   },
-                {lb:"Saldo acumulado",               val:R(saldo),    c:saldo>=0?C.accent:C.red, bold:true },
-              ].map(x=>(
-                <div key={x.lb} style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:`1px solid ${C.border}` }}>
-                  <span style={{ color:C.sub, fontSize:12 }}>{x.lb}</span>
-                  <span style={{ color:x.c, fontWeight:x.bold?800:600, fontSize:12 }}>{x.val}</span>
+                { lb: "Total mensalidades recebidas", val: R(tRec), c: C.green },
+                { lb: "Outras entradas", val: R(tEnt), c: C.green },
+                { lb: "Total saídas", val: R(tSai), c: C.red },
+                { lb: "Saldo acumulado", val: R(saldo), c: saldo >= 0 ? C.accent : C.red, bold: true },
+              ].map(x => (
+                <div key={x.lb} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${C.border}` }}>
+                  <span style={{ color: C.sub, fontSize: 12 }}>{x.lb}</span>
+                  <span style={{ color: x.c, fontWeight: x.bold ? 800 : 600, fontSize: 12 }}>{x.val}</span>
                 </div>
               ));
             })()}
           </Crd>
 
           <Crd>
-            <div style={{ color:C.text, fontWeight:700, fontSize:13, marginBottom:12 }}>🏘️ Status — {cap(fmtMes(mesQuadra))}</div>
-            {quadras.map(q=>{
-              const daCasa = moradores.filter(m=>m.quadra===q);
-              // Status calculado com o mês da aba Por Quadra — dinâmico
-              const adim   = daCasa.filter(m=>getStatus(m.casa_id, mesQuadra, pagamentos)==="pago").length;
+            <div style={{ color: C.text, fontWeight: 700, fontSize: 13, marginBottom: 12 }}>🏘️ Status — {cap(fmtMes(getMesNow()))}</div>
+            {quadras.map(q => {
+              const daCasa = moradores.filter(m => m.quadra === q);
+              const adim = daCasa.filter(m => getStatus(m.casa_id, getMesNow(), pagamentos) === "pago").length;
               return (
-                <div key={q} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 0", borderBottom:`1px solid ${C.border}` }}>
-                  <span style={{ color:C.sub, fontSize:12 }}>Quadra {q} ({daCasa.length} casas)</span>
-                  <div style={{ display:"flex", gap:8, fontSize:11, fontWeight:700 }}>
-                    <span style={{ color:C.green }}>✅ {adim}</span>
-                    <span style={{ color:C.yellow }}>⏳ {daCasa.length-adim}</span>
+                <div key={q} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: `1px solid ${C.border}` }}>
+                  <span style={{ color: C.sub, fontSize: 12 }}>Quadra {q} ({daCasa.length} casas)</span>
+                  <div style={{ display: "flex", gap: 8, fontSize: 11, fontWeight: 700 }}>
+                    <span style={{ color: C.green }}>✅ {adim}</span>
+                    <span style={{ color: C.yellow }}>⏳ {daCasa.length - adim}</span>
                   </div>
                 </div>
               );
@@ -1596,17 +1756,18 @@ const Relatorios = ({ moradores, pagamentos, financeiro }) => {
   );
 };
 
+
 // ============================================================
 // APP ROOT
 // ============================================================
 export default function App() {
-  const [page,         setPage]        = useState("dashboard");
-  const [selectedCasa, setSelectedCasa]= useState(null);
-  const [moradores,    setMoradores]   = useState([]);
-  const [pagamentos,   setPagamentos]  = useState([]);
-  const [financeiro,   setFinanceiro]  = useState([]);
-  const [loading,      setLoading]     = useState(true);
-  const [toasts,       setToasts]      = useState([]);
+  const [page, setPage] = useState("dashboard");
+  const [selectedCasa, setSelectedCasa] = useState(null);
+  const [moradores, setMoradores] = useState([]);
+  const [pagamentos, setPagamentos] = useState([]);
+  const [financeiro, setFinanceiro] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [toasts, setToasts] = useState([]);
 
   const toast = useCallback((msg, type = "success") => {
     const id = Date.now() + Math.random();
@@ -1628,15 +1789,15 @@ export default function App() {
   const renderPage = () => {
     if (loading) return <Spinner />;
     switch (page) {
-      case "dashboard":    return <Dashboard    moradores={moradores} pagamentos={pagamentos} financeiro={financeiro} />;
-      case "casas":        return <Casas        moradores={moradores} pagamentos={pagamentos} setPage={nav} setSelectedCasa={setSelectedCasa} />;
+      case "dashboard": return <Dashboard moradores={moradores} pagamentos={pagamentos} financeiro={financeiro} />;
+      case "casas": return <Casas moradores={moradores} pagamentos={pagamentos} setPage={nav} setSelectedCasa={setSelectedCasa} />;
       case "casa_detalhe": return selectedCasa
         ? <CasaDetalhe casa={selectedCasa} pagamentos={pagamentos} setPage={nav} toast={toast} reload={reload} />
         : <Casas moradores={moradores} pagamentos={pagamentos} setPage={nav} setSelectedCasa={setSelectedCasa} />;
-      case "cadastro":     return <Cadastro     toast={toast} reload={reload} setPage={nav} />;
-      case "financeiro":   return <Financeiro   financeiro={financeiro} toast={toast} reload={reload} />;
-      case "relatorios":   return <Relatorios   moradores={moradores} pagamentos={pagamentos} financeiro={financeiro} />;
-      default:             return <Dashboard    moradores={moradores} pagamentos={pagamentos} financeiro={financeiro} />;
+      case "cadastro": return <Cadastro toast={toast} reload={reload} setPage={nav} />;
+      case "financeiro": return <Financeiro financeiro={financeiro} toast={toast} reload={reload} />;
+      case "relatorios": return <Relatorios moradores={moradores} pagamentos={pagamentos} financeiro={financeiro} />;
+      default: return <Dashboard moradores={moradores} pagamentos={pagamentos} financeiro={financeiro} />;
     }
   };
 
