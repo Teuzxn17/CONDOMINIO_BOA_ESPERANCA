@@ -497,7 +497,7 @@ const Casas = ({ moradores, pagamentos, setPage, setSelectedCasa }) => {
                   <div class="meta">Mês Ref: ${mes} | Gerado em: ${new Date().toLocaleDateString('pt-BR')}</div>
                   <table>
                     <thead>
-                      <tr><th>Morador</th><th>Q.</th><th>Casa</th></tr>
+                      <tr><th>Morador</th><th>QD</th><th>Casa</th></tr>
                     </thead>
                     <tbody>
                       ${lista.map(m => `
