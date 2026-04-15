@@ -468,78 +468,71 @@ const Casas = ({ moradores, pagamentos, setPage, setSelectedCasa }) => {
           </button>
         ))}
       </div>
-      {/* Botão de Impressão Dinâmico */}
+      {/* 2. COLE O CÓDIGO ABAIXO AQUI (Entre a div de botões e o lista.length) */}
       {filtroSt !== "todos" && lista.length > 0 && (
         <button
           onClick={() => {
-            const win = window.open("", "_blank");
-            win.document.write(`
-        <html>
-          <head>
-            <title>Relatório ${filtroSt === 'pago' ? 'Adimplentes' : 'Pendentes'}</title>
-            <style>
-              @media print { @page { margin: 1cm; } }
-              body { font-family: 'Inter', sans-serif; padding: 20px; color: #1a1a1a; }
-              .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 20px; }
-              h1 { font-size: 18px; margin: 0; color: ${filtroSt === 'pago' ? '#16a34a' : '#ca8a04'}; text-transform: uppercase; }
-              .info { font-size: 11px; color: #666; }
-              table { width: 100%; border-collapse: collapse; }
-              th { text-align: left; background: #f4f4f5; padding: 10px; font-size: 10px; text-transform: uppercase; color: #71717a; border: 1px solid #e4e4e7; }
-              td { padding: 10px; font-size: 12px; border: 1px solid #e4e4e7; color: #27272a; }
-              tr:nth-child(even) { background: #fafafa; }
-              .footer { margin-top: 20px; font-size: 9px; color: #a1a1aa; text-align: center; }
-            </style>
-          </head>
-          <body>
-            <div class="header">
-              <div>
-                <h1>${filtroSt === 'pago' ? '✅ Relatório de Adimplentes' : '⏳ Relatório de Pendentes'}</h1>
-                <div class="info">Condomínio Boa Esperança • Referência: ${mes}</div>
-              </div>
-              <div style="text-align: right" class="info">
-                Gerado em: ${new Date().toLocaleDateString('pt-BR')}<br>
-                Total: ${lista.length} casas
-              </div>
-            </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>Morador</th>
-                  <th>Quadra</th>
-                  <th>Casa</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${lista.map(m => `
-                  <tr>
-                    <td style="font-weight: 600;">${m.nome.toUpperCase()}</td>
-                    <td>${m.quadra}</td>
-                    <td>${m.numero_casa}</td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-            <div class="footer">Documento gerado pelo Sistema de Gestão Boa Esperança</div>
-          </body>
-        </html>
-      `);
-            win.document.close();
+            // Criamos um frame invisível para o celular não bloquear o pop-up
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            document.body.appendChild(iframe);
 
-            // Pequeno delay para garantir que o CSS carregue antes de imprimir
-            setTimeout(() => {
-              win.print();
-              win.close();
-            }, 500);
+            const content = `
+              <html>
+                <head>
+                  <title>Relatório ${filtroSt === 'pago' ? 'Adimplentes' : 'Pendentes'}</title>
+                  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                  <style>
+                    body { font-family: sans-serif; padding: 20px; color: #1a1a1a; }
+                    h1 { font-size: 18px; color: ${filtroSt === 'pago' ? '#16a34a' : '#ca8a04'}; text-transform: uppercase; border-bottom: 2px solid #eee; padding-bottom: 8px; margin-bottom: 10px; }
+                    .meta { font-size: 10px; color: #888; margin-bottom: 20px; }
+                    table { width: 100%; border-collapse: collapse; }
+                    th, td { border: 1px solid #eee; padding: 10px; text-align: left; font-size: 12px; }
+                    th { background: #f9f9f9; color: #666; }
+                    @media print { body { padding: 0; } }
+                  </style>
+                </head>
+                <body>
+                  <h1>Relatório: ${filtroSt === 'pago' ? 'Adimplentes' : 'Pendentes'}</h1>
+                  <div class="meta">Mês Ref: ${mes} | Gerado em: ${new Date().toLocaleDateString('pt-BR')}</div>
+                  <table>
+                    <thead>
+                      <tr><th>Morador</th><th>Q.</th><th>Casa</th></tr>
+                    </thead>
+                    <tbody>
+                      ${lista.map(m => `
+                        <tr>
+                          <td><b>${m.nome.toUpperCase()}</b></td>
+                          <td>${m.quadra}</td>
+                          <td>${m.numero_casa}</td>
+                        </tr>
+                      `).join('')}
+                    </tbody>
+                  </table>
+                </body>
+              </html>
+            `;
+
+            iframe.contentDocument.write(content);
+            iframe.contentDocument.close();
+
+            iframe.onload = () => {
+              setTimeout(() => {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.print();
+                setTimeout(() => { document.body.removeChild(iframe); }, 1000);
+              }, 500);
+            };
           }}
           style={{
             width: "100%",
-            marginTop: 10,
+            marginBottom: 14,
             background: filtroSt === "pago" ? `${C.green}15` : `${C.yellow}15`,
             border: `1.5px solid ${filtroSt === "pago" ? C.green : C.yellow}`,
             borderRadius: 12,
-            padding: "10px",
+            padding: "12px",
             color: filtroSt === "pago" ? C.green : C.yellow,
-            fontSize: 11,
+            fontSize: 12,
             fontWeight: 800,
             cursor: "pointer",
             fontFamily: "inherit",
@@ -549,7 +542,7 @@ const Casas = ({ moradores, pagamentos, setPage, setSelectedCasa }) => {
             gap: 8
           }}
         >
-          🖨️ IMPRIMIR LISTA ({lista.length})
+          🖨️ IMPRIMIR LISTA (${lista.length})
         </button>
       )}
 
